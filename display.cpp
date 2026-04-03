@@ -6,6 +6,7 @@
 // ============================================================================
 
 #include "display.h"
+#include "storage.h"
 #include <SPI.h>
 #include <Adafruit_GFX.h>
 #include <Adafruit_SSD1351.h>
@@ -26,7 +27,7 @@ static const char* const STRING_TABLE[NUM_LANGUAGES][NUM_STRINGS] = {
         "X=retry S=keep", "Purge fluid!", "Overpressure!", "Too close to zero",
         "Hold Mode", "Deadzones", "Default Curve", "Snap Threshold",
         "Btn Debounce", "Refresh Rates", "Recalibrate", "Save & Load", "Language",
-        "Low:", "High:", "USB/ADC:", "Display:", "ms", "Hz",
+        "Low:", "High:", "USB/ADC:", "Display:", "ms", "Hz", "Redo", "Next",
     },
     // ---- LANG_ES ----
     {
@@ -40,7 +41,7 @@ static const char* const STRING_TABLE[NUM_LANGUAGES][NUM_STRINGS] = {
         "X=rein S=guard", "Purgar fluido!", "Sobrepresion!", "Muy cerca de cero",
         "Modo Espera", "Zonas Muertas", "Curva Default", "Umbral Snap",
         "Antirrebote", "Tasas Refresco", "Recalibrar", "Guard & Cargar", "Idioma",
-        "Bajo:", "Alto:", "USB/ADC:", "Pantalla:", "ms", "Hz",
+        "Bajo:", "Alto:", "USB/ADC:", "Pantalla:", "ms", "Hz", "Rehacer", "Seguir",
     },
 };
 
@@ -709,7 +710,7 @@ void displayDrawCalibrate(const UIState& ui, const CalibData& calib, uint8_t lan
             tft.setCursor(8, baseY+10); tft.print(str(STR_CAL_ZERO_OK));
             printDeciValue(8, baseY+24, calib.resultCentiVolts/10, EDIT_VALUE_COLOR, 2);
             tft.setTextSize(1); tft.setCursor(80, baseY+28); tft.print(str(STR_VOLTS));
-            tft.setTextColor(EDIT_LABEL_COLOR); tft.setCursor(8, baseY+50); tft.print(str(STR_CAL_RETRY));
+//            tft.setTextColor(EDIT_LABEL_COLOR); tft.setCursor(8, baseY+50); tft.print(str(STR_CAL_RETRY));
             break;
         case CALIB_PROMPT_MAX:
             tft.setTextSize(1); tft.setTextColor(LIVE_WARN_COLOR);
@@ -721,7 +722,7 @@ void displayDrawCalibrate(const UIState& ui, const CalibData& calib, uint8_t lan
             tft.setCursor(8, baseY+10); tft.print(str(STR_CAL_MAX_OK));
             printDeciValue(8, baseY+24, calib.resultCentiVolts/10, EDIT_VALUE_COLOR, 2);
             tft.setTextSize(1); tft.setCursor(80, baseY+28); tft.print(str(STR_VOLTS));
-            tft.setTextColor(EDIT_LABEL_COLOR); tft.setCursor(8, baseY+50); tft.print(str(STR_CAL_RETRY));
+//            tft.setTextColor(EDIT_LABEL_COLOR); tft.setCursor(8, baseY+50); tft.print(str(STR_CAL_RETRY));
             break;
         case CALIB_DONE:
             tft.setTextSize(1); tft.setTextColor(LIVE_OK_COLOR);
@@ -735,8 +736,22 @@ void displayDrawCalibrate(const UIState& ui, const CalibData& calib, uint8_t lan
             tft.setCursor(8, baseY+10); tft.print(str(STR_CAL_ERROR));
             tft.setTextSize(1); tft.setTextColor(LIVE_WARN_COLOR);
             tft.setCursor(8, baseY+34); if (calib.errorMsg) tft.print(calib.errorMsg);
-            tft.setTextColor(EDIT_LABEL_COLOR); tft.setCursor(8, baseY+52); tft.print(str(STR_CAL_RETRY));
+//            tft.setTextColor(EDIT_LABEL_COLOR); tft.setCursor(8, baseY+52); tft.print(str(STR_CAL_RETRY));
             break;
+    }
+    // Draw Redo and Next buttons at the bottom of the content area
+    // Only shown when in EDIT_VALUE state (not preview from MENU_LIST)
+    if (ui.state == DISPLAY_EDIT_VALUE) {
+        int16_t btnY = SCREEN_HEIGHT - 20;
+        // Redo button
+        drawButtonHighlight(4, btnY, 56, 16, ui.menuScrollPos == 4);
+        tft.setTextSize(1);
+        tft.setTextColor((ui.menuScrollPos == 4) ? NAV_SELECTED_FG : EDIT_LABEL_COLOR);
+        tft.setCursor(12, btnY + 4); tft.print(str(STR_CAL_REDO));
+        // Next button
+        drawButtonHighlight(66, btnY, 56, 16, ui.menuScrollPos == 5);
+        tft.setTextColor((ui.menuScrollPos == 5) ? NAV_SELECTED_FG : EDIT_LABEL_COLOR);
+        tft.setCursor(76, btnY + 4); tft.print(str(STR_CAL_NEXT));
     }
 }
 
@@ -747,7 +762,7 @@ void displayDrawSaveLoad(const UIState& ui, uint8_t selectedSlot,
     displayDrawEditTitle(str(STR_TITLE_SAVE_LOAD));
     int16_t baseY = CONTENT_Y + 16;
     for (uint8_t i = 0; i < NUM_NVS_PROFILES; i++) {
-        int16_t slotY = baseY + i * 18;
+        int16_t slotY = baseY + i * 14;
         bool isSel = (ui.menuScrollPos == (4+i));
         drawButtonHighlight(4, slotY, 120, 16, isSel);
         tft.setTextSize(1); tft.setTextColor(isSel ? NAV_SELECTED_FG : EDIT_LABEL_COLOR);
@@ -755,7 +770,7 @@ void displayDrawSaveLoad(const UIState& ui, uint8_t selectedSlot,
         if (slotExists[i]) { tft.setTextColor(isSel?NAV_SELECTED_FG:LIVE_OK_COLOR); tft.print(str(STR_SAVED)); }
         else { tft.setTextColor(isSel?NAV_SELECTED_FG:NAV_NORMAL_FG); tft.print(str(STR_EMPTY)); }
     }
-    int16_t actY = baseY + NUM_NVS_PROFILES*18 + 4;
+    int16_t actY = baseY + NUM_NVS_PROFILES*14 + 4;
     uint8_t sb = 4+NUM_NVS_PROFILES, lb = sb+1;
     drawButtonHighlight(4, actY, 56, 16, ui.menuScrollPos==sb);
     tft.setTextSize(1); tft.setTextColor((ui.menuScrollPos==sb)?NAV_SELECTED_FG:EDIT_LABEL_COLOR);
@@ -791,7 +806,9 @@ void displayDrawEditScreen(const UIState& ui, const DeviceConfig& cfg, const Liv
         case 5: displayDrawRefreshRates(ui, cfg); break;
         case 6: { CalibData ec; ec.state=CALIB_IDLE; ec.sampleCount=0; ec.settleStableCount=0; ec.errorMsg=NULL;
                    displayDrawCalibrate(ui, ec, cfg.language); break; }
-        case 7: { bool es[NUM_NVS_PROFILES]={false}; displayDrawSaveLoad(ui, 0, es, cfg.language); break; }
+        //case 7: { bool es[NUM_NVS_PROFILES]={false}; displayDrawSaveLoad(ui, 0, es, cfg.language); break; }
+        case 7: { bool es[NUM_NVS_PROFILES]; for(uint8_t i=0;i<NUM_NVS_PROFILES;i++) es[i]=storageProfileExists(i);
+           displayDrawSaveLoad(ui, 0, es, cfg.language); break; }
         case 8: displayDrawLanguage(ui, cfg.language); break;
         default: break;
     }

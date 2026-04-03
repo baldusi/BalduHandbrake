@@ -263,9 +263,10 @@ static void calibUpdate(const LiveData& liveData, const DeviceConfig& ac, unsign
                 if((nowMs-lastCalibSampleMs)>=calibSampleInterval) {
                     calibData.samples[calibData.sampleCount]=liveData.rawAdc;
                     calibData.sampleCount++; lastCalibSampleMs=nowMs;
-                    forceFullRedraw=true;
                 }
             }
+            static unsigned long lastSamplingRedraw=0;
+            if((nowMs-lastSamplingRedraw)>=200) { lastSamplingRedraw=nowMs; forceFullRedraw=true; }
             break; }
         default: break;
     }
@@ -310,17 +311,29 @@ static void handleEncoderClick(const DeviceConfig& ac, DeviceConfig& pc,
                 uiState.state=DISPLAY_MENU_LIST; uiState.menuScrollPos=3; forceFullRedraw=true;
             } else if(uiState.menuScrollPos==3) {
                 if(uiState.editScreenIndex==6) calibReset();
-                uiState.state=DISPLAY_MENU_LIST; uiState.menuScrollPos=3; forceFullRedraw=true;
+                editConfig = ac; uiState.state=DISPLAY_MENU_LIST; uiState.menuScrollPos=3; forceFullRedraw=true;
             } else {
                 uint8_t bi=uiState.menuScrollPos;
                 if(uiState.editScreenIndex==6) {
-                    switch(calibData.state) {
-                        case CALIB_IDLE: case CALIB_PROMPT_ZERO: calibStartSettling(true); break;
-                        case CALIB_RESULT_ZERO: calibData.state=CALIB_PROMPT_MAX; forceFullRedraw=true; break;
-                        case CALIB_PROMPT_MAX: calibStartSettling(false); break;
-                        case CALIB_RESULT_MAX: calibData.state=CALIB_DONE; forceFullRedraw=true; break;
-                        case CALIB_ERROR: calibReset(); forceFullRedraw=true; break;
-                        default: break;
+                    if(bi==4) {
+                        // Redo button
+                        switch(calibData.state) {
+                            case CALIB_RESULT_ZERO: calibStartSettling(true); break;
+                            case CALIB_RESULT_MAX:  calibStartSettling(false); break;
+                            case CALIB_DONE:        calibReset(); calibStartSettling(true); break;
+                            case CALIB_ERROR:       calibReset(); calibStartSettling(true); break;
+                            default: break;  // Ignored during settling/sampling/idle
+                        }
+                        forceFullRedraw=true;
+                    } else if(bi==5) {
+                        // Next button
+                        switch(calibData.state) {
+                            case CALIB_IDLE: case CALIB_PROMPT_ZERO: calibStartSettling(true); break;
+                            case CALIB_RESULT_ZERO: calibData.state=CALIB_PROMPT_MAX; forceFullRedraw=true; break;
+                            case CALIB_PROMPT_MAX:  calibStartSettling(false); break;
+                            case CALIB_RESULT_MAX:  calibData.state=CALIB_DONE; forceFullRedraw=true; break;
+                            default: break;  // Ignored during settling/sampling/done
+                        }
                     }
                 } else if(uiState.editScreenIndex==7) {
                     if(bi==4+NUM_NVS_PROFILES) { storageSaveProfile(selectedProfileSlot,editConfig); profileSlotExists[selectedProfileSlot]=true; forceFullRedraw=true; }
@@ -394,7 +407,7 @@ static void updateDisplay(const LiveData& ld, const DeviceConfig& ac, unsigned l
                 break;
             case DISPLAY_MENU_LIST:
                 displayDrawNavBar(uiState);
-                displayDrawEditScreen(uiState,editConfig,ld);
+                displayDrawEditScreen(uiState, ac, ld);
                 break;
             case DISPLAY_EDIT_VALUE:
                 displayDrawNavBar(uiState);
@@ -429,6 +442,7 @@ static void updateDisplay(const LiveData& ld, const DeviceConfig& ac, unsigned l
 // ============================================================================
 void uiUpdate(const LiveData& ld, const DeviceConfig& ac,
               DeviceConfig& pc, volatile bool& cd, unsigned long nowMs) {
+    
     prevUiState=uiState;
     if(uiState.state==DISPLAY_LIVE && uiState.liveScreen!=ac.liveScreen) {
         uiState.liveScreen=ac.liveScreen; forceFullRedraw=true;
