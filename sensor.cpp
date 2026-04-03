@@ -163,6 +163,37 @@ void sensorUpdate(const DeviceConfig& cfg, LiveData& out) {
     // ------------------------------------------------------------------
     int16_t adcRaw = ads.getValue();
 
+    // ------------------------------------------------------------------
+    // 1a. Median-of-3 pre-filter (kills single-sample spikes)
+    // ------------------------------------------------------------------
+    static int16_t med0 = 0, med1 = 0, med2 = 0;
+    med2 = med1;
+    med1 = med0;
+    med0 = adcRaw;
+    int16_t adcMedian;
+    if (med0 >= med1) {
+        if (med1 >= med2)      adcMedian = med1;  // 0 >= 1 >= 2
+        else if (med0 >= med2) adcMedian = med2;  // 0 >= 2 > 1
+        else                   adcMedian = med0;  // 2 > 0 >= 1
+    } else {
+        if (med0 >= med2)      adcMedian = med0;  // 1 > 0 >= 2
+        else if (med1 >= med2) adcMedian = med2;  // 1 >= 2 > 0
+        else                   adcMedian = med1;  // 2 > 1 > 0
+    }
+
+    // ------------------------------------------------------------------
+    // 1b. EMA temporal filter (K=8, ~8ms settling at 1000Hz)
+    // ------------------------------------------------------------------
+    static int32_t emaAccum = -1;
+    if (emaAccum < 0) {
+        emaAccum = (int32_t)adcMedian << 3;  // Seed on first read
+    }
+    emaAccum += (int32_t)adcMedian - (emaAccum >> 3);
+    adcRaw = (int16_t)(emaAccum >> 3);
+
+    // ------------------------------------------------------------------
+    // 1c. Continue pipeline with filtered value
+    // ------------------------------------------------------------------
     out.rawAdc = (adcRaw > 0) ? (uint16_t)adcRaw : 0;
     out.centiVolts = rawToCentiVolts(adcRaw);
 

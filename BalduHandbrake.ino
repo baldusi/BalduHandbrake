@@ -2,6 +2,7 @@
 // BalduHandbrake.ino — Main Sketch
 // ============================================================================
 // Open Source Hydraulic Simracing Handbrake
+// Copyright (c) 2026 Alejandro Belluscio
 //
 // Hardware: Waveshare ESP32-S3 Zero + ADS1115 ADC + SSD1351 OLED
 //           + EC11 Rotary Encoder + Momentary Hold Button
