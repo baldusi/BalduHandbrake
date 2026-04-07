@@ -1,0 +1,42 @@
+ESP32-S3 -> SSD1351
+OUT 	 -> VCC
+GND 	 -> GND
+GPIO 11	 -> DIN
+GPIO 12	 -> CLK
+GPIO 10	 -> CS
+GPIO 6	 -> DC
+GPIO 7	 -> RST
+
+Cap between SSD1351 VCC and GND
+
+
+ESP32-S3 -> Logic Converter -> ADS1115
+OUT 	 -> VCC
+GND 	 -> GND
+GPIO 9 	 -> LV4
+GPIO 8	 -> LV3
+5V 	 --------------------> VCC
+GND 	 --------------------> GND
+	    LH4		    -> SCL
+	    LH3		    -> SDA
+Cap between ADS1115 VCC and GND
+
+
+Transducer -> ESP32-S3
+VCC	   -> 5V
+GND	   -> GND
+OUT	   -> Resistor 220R -> ADS1115 (A0)
+
+Cap between OUT and GND
+
+ESP32-S3 -> Momentary Button
+GND 	 -> GND
+GPIO 4	 -> Momentary Button
+
+ESP32-S3 -> Rotary Encoder EC11
+OUT 	 -> VCC
+GND 	 -> GND
+GPIO 3	 -> Button
+GPIO 5	 -> CLK
+GPIO 13	 -> DT
+

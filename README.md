@@ -131,13 +131,14 @@ Old saved profiles remain compatible — new fields load with their default valu
 
 ```
 BalduHandbrake/
+  assets.h            — icons, buttons and custom fonts are stored here as code
   BalduHandbrake.ino  — setup(), FreeRTOS task creation, shared state
   config.h            — types, enums, structs, pin maps, defaults, tuning constants
   curves.h            — precomputed LUT data for response curves
-  sensor.h/.cpp       — ADC pipeline (Core 0)
-  hid.h/.cpp          — USB HID descriptor + hold button logic (Core 0)
-  storage.h/.cpp      — NVS profile persistence
   display.h/.cpp      — OLED rendering + localization string table
+  hid.h/.cpp          — USB HID descriptor + hold button logic (Core 0)
+  sensor.h/.cpp       — ADC pipeline (Core 0)
+  storage.h/.cpp      — NVS profile persistence
   ui.h/.cpp           — encoder input, menu state machine, calibration (Core 1)
 ```
 
@@ -153,8 +154,7 @@ BalduHandbrake/
 
 - **Adafruit TinyUSB** — USB HID
 - **ADS1X15** by Rob Tillaart — ADC driver
-- **Adafruit SSD1351** — OLED driver
-- **Adafruit GFX** — Graphics primitives
+- **LovyanGFX** — OLED driver and graphic primitives
 - **RotaryEncoder** by Matthias Hertel — Encoder input
 
 ### Arduino IDE Settings
@@ -206,7 +206,7 @@ Alternatively, to upload without having to wait, but you need physical access:
 2. Add a complete row to `STRING_TABLE[][]` in `display.cpp`
 3. Add the language name to `LANG_NAMES[]` in `display.cpp`
 
-Note: The SSD1351 with Adafruit_GFX only supports 7-bit ASCII. Use unaccented approximations for non-English translations. Full Unicode support would require replacing the font renderer (e.g., u8g2 library).
+Note: The SSD1351 with LovyanGFX does supports UTF-8, but most fonts only support 7-bit ASCII. Use unaccented approximations for non-English translations. Full Unicode support would require replacing the font.
 
 ### Adding a Configuration Parameter
 

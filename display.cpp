@@ -7,9 +7,11 @@
 
 #include "display.h"
 #include "storage.h"
-#include <SPI.h>
-#include <Adafruit_GFX.h>
-#include <Adafruit_SSD1351.h>
+
+#include "assets.h"
+
+#define LGFX_USE_V1
+#include <LovyanGFX.hpp>
 
 // ============================================================================
 //  Localization String Table
@@ -17,7 +19,7 @@
 static const char* const STRING_TABLE[NUM_LANGUAGES][NUM_STRINGS] = {
     // ---- LANG_EN ----
     {
-        "E-BRAKE", "v1.0", "A.Belluscio", "BalduHandbrake", "Initializing...",
+        "E-BRAKE", "v1.1", "A.Belluscio", "BalduHandbrake", "Initializing...",
         "HOLD", "LIVE", "PSI", "V", "%",
         "FAIL", "LOW", "OVER",
         "Game", "Firmware",
@@ -31,7 +33,7 @@ static const char* const STRING_TABLE[NUM_LANGUAGES][NUM_STRINGS] = {
     },
     // ---- LANG_ES ----
     {
-        "E-BRAKE", "v1.0", "A.Belluscio", "BalduHandbrake", "Iniciando...",
+        "E-BRAKE", "v1.1", "A.Belluscio", "BalduHandbrake", "Iniciando...",
         "SOSTEN", "VIVO", "PSI", "V", "%",
         "FALLO", "BAJA", "SOBRE",
         "Juego", "Firmware",
@@ -48,11 +50,52 @@ static const char* const STRING_TABLE[NUM_LANGUAGES][NUM_STRINGS] = {
 static const char* const LANG_NAMES[NUM_LANGUAGES] = { "English", "Espanol" };
 
 // ============================================================================
-//  Module-local state
+//  LGFX custom class — exact physical wiring
 // ============================================================================
-static Adafruit_SSD1351 tft = Adafruit_SSD1351(
-    SCREEN_WIDTH, SCREEN_HEIGHT, &SPI, OLED_CS, OLED_DC, OLED_RST
-);
+class LGFX : public lgfx::LGFX_Device {
+  lgfx::Bus_SPI _bus_instance;
+  lgfx::Panel_SSD1351 _panel_instance;
+
+public:
+  LGFX(void) {
+    Serial.println("[LGFX] Constructor started");
+
+    auto bus_cfg = _bus_instance.config();
+    bus_cfg.spi_host = SPI2_HOST;
+    bus_cfg.spi_mode = 0;
+    bus_cfg.freq_write = 24000000;
+    bus_cfg.freq_read  = 16000000;
+    bus_cfg.spi_3wire  = false;
+    bus_cfg.use_lock   = true;
+    bus_cfg.dma_channel = SPI_DMA_CH_AUTO;
+
+    bus_cfg.pin_mosi = 11;   // DIN
+    bus_cfg.pin_miso = -1;
+    bus_cfg.pin_sclk = 12;   // CLK
+    bus_cfg.pin_dc   = 6;    // DC
+    _bus_instance.config(bus_cfg);
+
+    _panel_instance.setBus(&_bus_instance);
+
+    auto panel_cfg = _panel_instance.config();
+    panel_cfg.pin_cs     = 10;
+    panel_cfg.pin_rst    = 7;
+    panel_cfg.pin_busy   = -1;
+    panel_cfg.offset_x   = 0;
+    panel_cfg.offset_y   = 0;
+    panel_cfg.offset_rotation = 0;
+    panel_cfg.dlen_16bit = false;
+    panel_cfg.bus_shared = false;
+    panel_cfg.invert     = false;
+    _panel_instance.config(panel_cfg);
+
+    setPanel(&_panel_instance);
+    Serial.println("[LGFX] Constructor finished");
+  }
+};
+
+static LGFX lcd;    // global display object
+
 static uint8_t activeLang = LANG_EN;
 
 // Display hysteresis trackers
@@ -116,37 +159,40 @@ static uint8_t getErrorState(const LiveData& data) {
 }
 
 static void printDeciValue(int16_t x, int16_t y, uint16_t deciVal,
-                           uint16_t color, uint8_t textSize) {
-    tft.setTextColor(color);
-    tft.setTextSize(textSize);
-    tft.setCursor(x, y);
-    tft.print(deciVal / 10u);
-    tft.print(".");
-    tft.print(deciVal % 10u);
+                           uint16_t fg_color,  uint16_t bg_color, const lgfx::IFont* font = &fonts::DejaVu12) {
+    lcd.setFont(font);
+    lcd.setTextColor(fg_color, bg_color);
+    lcd.setCursor(x, y);
+    lcd.print(deciVal / 10u);
+    lcd.print(".");
+    lcd.print(deciVal % 10u);
 }
 
 static void printSensorStatus(int16_t x, int16_t y, const LiveData& data,
-                               uint8_t textSize) {
-    tft.setTextSize(textSize);
-    tft.setCursor(x, y);
+                               uint16_t bg_color, const lgfx::IFont* font = &fonts::DejaVu12) {
+    lcd.setFont(font);
+    lcd.setCursor(x, y);
     if (data.transducerFail) {
-        tft.setTextColor(LIVE_ERROR_COLOR); tft.print(str(STR_FAIL));
+        lcd.setTextColor(LIVE_ERROR_COLOR, bg_color); lcd.print(str(STR_FAIL));
     } else if (data.pressureLow) {
-        tft.setTextColor(LIVE_WARN_COLOR); tft.print(str(STR_LOW));
+        lcd.setTextColor(LIVE_WARN_COLOR, bg_color); lcd.print(str(STR_LOW));
     } else if (data.saturationFail) {
-        tft.setTextColor(LIVE_ERROR_COLOR); tft.print(str(STR_OVER));
+        lcd.setTextColor(LIVE_ERROR_COLOR, bg_color); lcd.print(str(STR_OVER));
     }
 }
 
 // --- Hold indicator ---
 static void drawHoldIndicator(int16_t x, int16_t y, bool holdActive) {
-    tft.fillRect(x, y, 56, 16, LIVE_BG_COLOR);
-    tft.setTextSize(2);
-    tft.setCursor(x, y);
-    if (holdActive) {
-        tft.setTextColor(LIVE_ERROR_COLOR); tft.print(str(STR_HOLD));
+	if (holdActive) {
+        // Use the 64x20 pre-rendered logo (centered in the old 56x16 area)
+        lcd.pushImage(x, y, 60, 20, (const lgfx::rgb565_t*)icon_live_hold.data);
     } else {
-        tft.setTextColor(LIVE_OK_COLOR); tft.print(str(STR_LIVE));
+		//Just blank it, we should move to just push the HOLD icon.
+        lcd.fillRect(x, y, 60, 20, LIVE_BG_COLOR);
+        //lcd.setFont(&fonts::DejaVu18);
+        //lcd.setTextColor(LIVE_OK_COLOR, LIVE_BG_COLOR);
+        //lcd.setCursor(x, y);
+        //lcd.print(str(STR_LIVE));
     }
 }
 
@@ -160,50 +206,109 @@ static void updateHoldIfChanged(int16_t x, int16_t y, bool holdActive) {
 
 // --- Curve name ---
 static void drawCurveName(int16_t x, int16_t y, uint8_t curveIndex,
-                          uint16_t color, uint8_t textSize) {
-    tft.setTextColor(color);
-    tft.setTextSize(textSize);
-    tft.setCursor(x, y);
-    if (curveIndex < NUM_CURVES) tft.print(CURVE_NAMES[curveIndex]);
+                          uint16_t fg_color,  uint16_t bg_color, const lgfx::IFont* font = &fonts::DejaVu18) {
+    lcd.setFont(font);
+    lcd.setTextColor(fg_color, bg_color);
+    lcd.setCursor(x, y);
+    if (curveIndex < NUM_CURVES) lcd.print(CURVE_NAMES[curveIndex]);
 }
 
 static void updateCurveIfChanged(int16_t x, int16_t y, uint8_t curveIndex,
                                   int16_t clearW) {
     if (curveIndex != lastDispCurveIndex) {
-        tft.fillRect(x, y, clearW, 16, LIVE_BG_COLOR);
-        drawCurveName(x, y, curveIndex, LIVE_FG_COLOR, 2);
+        lcd.fillRect(x, y, clearW, 18, LIVE_BG_COLOR);
+        drawCurveName(x, y, curveIndex, LIVE_FG_COLOR, LIVE_BG_COLOR);
         lastDispCurveIndex = curveIndex;
     }
 }
 
 // --- Edit screen arrows ---
 static void drawSmallArrowUp(int16_t cx, int16_t y, uint16_t color) {
-    tft.fillTriangle(cx-4, y+8, cx+4, y+8, cx, y, color);
+    lcd.fillTriangle(cx-4, y+8, cx+4, y+8, cx, y, color);
 }
 static void drawSmallArrowDown(int16_t cx, int16_t y, uint16_t color) {
-    tft.fillTriangle(cx-4, y, cx+4, y, cx, y+8, color);
+    lcd.fillTriangle(cx-4, y, cx+4, y, cx, y+8, color);
 }
 static void drawDoubleArrowUp(int16_t cx, int16_t y, uint16_t color) {
-    tft.fillTriangle(cx-4, y+8, cx+4, y+8, cx, y+2, color);
-    tft.fillTriangle(cx-4, y+12, cx+4, y+12, cx, y+6, color);
+    lcd.fillTriangle(cx-4, y+8, cx+4, y+8, cx, y+2, color);
+    lcd.fillTriangle(cx-4, y+12, cx+4, y+12, cx, y+6, color);
 }
 static void drawDoubleArrowDown(int16_t cx, int16_t y, uint16_t color) {
-    tft.fillTriangle(cx-4, y, cx+4, y, cx, y+6, color);
-    tft.fillTriangle(cx-4, y+4, cx+4, y+4, cx, y+10, color);
+    lcd.fillTriangle(cx-4, y, cx+4, y, cx, y+6, color);
+    lcd.fillTriangle(cx-4, y+4, cx+4, y+4, cx, y+10, color);
 }
 static void drawButtonHighlight(int16_t x, int16_t y, int16_t w, int16_t h,
                                 bool isSelected) {
-    tft.fillRect(x, y, w, h, isSelected ? NAV_SELECTED_BG : EDIT_BG_COLOR);
+    lcd.fillRect(x, y, w, h, isSelected ? NAV_SELECTED_BG : EDIT_BG_COLOR);
+}
+
+// --- Draws selectable text for menus ---
+//Draws a selectable row, but allows for a differentiated color while displayed.
+//Used for now on profiles, but might be useful for other uses in the future.
+static void drawSelectableRowStatus(int16_t x, int16_t y, int16_t w, int16_t h,
+                                    const char* label,
+                                    const char* status, uint16_t statusFg,
+                                    bool isSelected,
+                                    const lgfx::IFont* font = &fonts::DejaVu9) {
+    drawButtonHighlight(x, y, w, h, isSelected);
+    uint16_t bg = isSelected ? NAV_SELECTED_BG : EDIT_BG_COLOR;
+    uint16_t labelFg = isSelected ? NAV_SELECTED_FG : EDIT_LABEL_COLOR;
+
+    lcd.setFont(font);
+    lcd.setTextColor(labelFg, bg);
+    lcd.setCursor(x + 4, y + 4);
+    lcd.print(label);
+
+    // Status: when selected, force white-on-highlight for legibility;
+    // when not selected, use the semantic status color.
+    lcd.setTextColor(isSelected ? NAV_SELECTED_FG : statusFg, bg);
+    lcd.print(status);
+}
+
+// Draw a selectable row: highlight bar + label on the left, optional status marker on the right.
+// Used for things like language or Hold mode.
+// If isActive is true, the row uses the "active value" foreground color and shows "*".
+static void drawSelectableRow(int16_t x, int16_t y, int16_t w, int16_t h,
+                              const char* label,
+                              bool isSelected, bool isActive,
+                              const lgfx::IFont* font = &fonts::DejaVu18) {
+    drawButtonHighlight(x, y, w, h, isSelected);
+
+    uint16_t bg = isSelected ? NAV_SELECTED_BG : EDIT_BG_COLOR;
+    uint16_t fg;
+    if (isSelected)      fg = NAV_SELECTED_FG;
+    else if (isActive)   fg = EDIT_VALUE_COLOR;   // cyan — "this is the current value"
+    else                 fg = NAV_NORMAL_FG;      // dim — "other option"
+
+    lcd.setFont(font);
+    lcd.setTextColor(fg, bg);
+    lcd.setCursor(x + 4, y + 3);
+    lcd.print(label);
+
+    if (isActive) {
+        lcd.setCursor(x + w - 16, y + 3);
+        lcd.print("*");
+    }
 }
 
 // ============================================================================
 //  displayInit()
 // ============================================================================
 void displayInit() {
-    SPI.begin(OLED_SCK, -1, OLED_MOSI);
-    tft.begin();
-    tft.setRotation(0);
+    Serial.println("[SSD1351] Starting...");
+    bool initOK = lcd.init();
+    Serial.print("displayInit returned: ");
+    Serial.println(initOK ? "SUCCESS" : "FAILED");
+    lcd.setRotation(4);
+    lcd.setBrightness(255);
+    lcd.setColorDepth(16);
+    lcd.invertDisplay(false);
+    lcd.fillScreen(LIVE_BG_COLOR);
+
+    lcd.setFont(&fonts::DejaVu12);
+
     delay(200);
+
 }
 
 // ============================================================================
@@ -211,17 +316,27 @@ void displayInit() {
 // ============================================================================
 void displayBootScreen(uint8_t language) {
     activeLang = language;
-    tft.fillScreen(LIVE_BG_COLOR);
-    tft.setTextColor(LIVE_FG_COLOR); tft.setTextSize(2);
-    tft.setCursor(16, 24); tft.print(str(STR_BOOT_TITLE));
-    tft.setTextSize(1);
-    tft.setTextColor(LIVE_VALUE_COLOR);
-    tft.setCursor(16, 52); tft.print(str(STR_BOOT_PROJECT));
-    tft.setTextColor(LIVE_LABEL_COLOR);
-    tft.setCursor(16, 66); tft.print(str(STR_BOOT_VERSION));
-    tft.setCursor(16, 80); tft.print(str(STR_BOOT_AUTHOR));
-    tft.setTextColor(LIVE_OK_COLOR);
-    tft.setCursor(16, 100); tft.print(str(STR_BOOT_STATUS));
+    lcd.fillScreen(LIVE_BG_COLOR);
+
+    lcd.setFont(&fonts::DejaVu18);
+    lcd.setTextColor(LIVE_FG_COLOR, LIVE_BG_COLOR);
+    lcd.setCursor(8, 24);
+	lcd.print(str(STR_BOOT_TITLE));
+
+    lcd.setFont(&fonts::DejaVu12);
+    lcd.setTextColor(LIVE_VALUE_COLOR, LIVE_BG_COLOR);
+    lcd.setCursor(8, 52);
+	lcd.print(str(STR_BOOT_PROJECT));
+
+    lcd.setTextColor(LIVE_LABEL_COLOR, LIVE_BG_COLOR);
+    lcd.setCursor(8, 66);
+	lcd.print(str(STR_BOOT_VERSION));
+    lcd.setCursor(8, 80);
+	lcd.print(str(STR_BOOT_AUTHOR));
+    lcd.setTextColor(LIVE_OK_COLOR, LIVE_BG_COLOR);
+    lcd.setCursor(8, 100);
+	lcd.print(str(STR_BOOT_STATUS));
+
     delay(2000);
 }
 
@@ -231,14 +346,15 @@ void displayBootScreen(uint8_t language) {
 void displaySetupLiveFull(const DeviceConfig& cfg) {
     activeLang = cfg.language;
     resetDisplayHysteresis();
-    tft.fillScreen(LIVE_BG_COLOR);
-    drawCurveName(4, 2, cfg.curveIndex, LIVE_FG_COLOR, 2);
+    lcd.fillScreen(LIVE_BG_COLOR);
+    drawCurveName(12, 2, cfg.curveIndex, LIVE_FG_COLOR, LIVE_BG_COLOR);
     lastDispCurveIndex = cfg.curveIndex;
-    tft.setTextSize(2); tft.setTextColor(LIVE_LABEL_COLOR);
-    tft.setCursor(90, 32); tft.print(str(STR_PSI));
-    tft.setCursor(90, 54); tft.print(str(STR_VOLTS));
-    tft.setCursor(90, 76); tft.print(str(STR_PERCENT));
-    tft.drawRect(4, 116, 122, 12, LIVE_FG_COLOR);
+    lcd.setFont(&fonts::DejaVu18);
+    lcd.setTextColor(LIVE_LABEL_COLOR, LIVE_BG_COLOR);
+    lcd.setCursor(90, 26); lcd.print(str(STR_PSI));
+    lcd.setCursor(90, 48); lcd.print(str(STR_VOLTS));
+    lcd.setCursor(90, 72); lcd.print(str(STR_PERCENT));
+    lcd.drawRect(4, 116, 122, 12, LIVE_FG_COLOR);
 }
 
 void displayUpdateLiveFull(const LiveData& data, const DeviceConfig& cfg) {
@@ -246,38 +362,38 @@ void displayUpdateLiveFull(const LiveData& data, const DeviceConfig& cfg) {
     uint8_t errState = getErrorState(data);
 
     // Curve name (updates on change)
-    updateCurveIfChanged(4, 2, cfg.curveIndex, 120);
+    updateCurveIfChanged(12, 1, cfg.curveIndex, 120);
 
     // PSI
     uint16_t deciPsi = (uint16_t)(data.centiPsi / 10u);
     if (deciPsi != lastDispDeciPsi || errState != lastDispErrorState) {
-        tft.fillRect(12, 32, 70, 16, LIVE_BG_COLOR);
-        if (errState) printSensorStatus(12, 32, data, 2);
-        else printDeciValue(12, 32, deciPsi, LIVE_OK_COLOR, 2);
+        lcd.fillRect(12, 26, 70, 16, LIVE_BG_COLOR);
+        if (errState) printSensorStatus(12, 26, data, LIVE_BG_COLOR, &fonts::DejaVu18);
+        else printDeciValue(12, 26, deciPsi, LIVE_OK_COLOR, LIVE_BG_COLOR, &fonts::DejaVu18);
         lastDispDeciPsi = deciPsi;
     }
 
     // Voltage
     uint16_t deciVolts = (uint16_t)(data.centiVolts / 10u);
     if (deciVolts != lastDispDeciVolts) {
-        tft.fillRect(12, 54, 70, 16, LIVE_BG_COLOR);
-        printDeciValue(12, 54, deciVolts, LIVE_ERROR_COLOR, 2);
+        lcd.fillRect(12, 48, 70, 16, LIVE_BG_COLOR);
+        printDeciValue(12, 48, deciVolts, LIVE_ERROR_COLOR, LIVE_BG_COLOR, &fonts::DejaVu18);
         lastDispDeciVolts = deciVolts;
     }
 
     // Percentage
     uint16_t deciPercent = (uint16_t)(data.centiPercent / 10u);
     if (deciPercent != lastDispDeciPercent || errState != lastDispErrorState) {
-        tft.fillRect(12, 76, 70, 16, LIVE_BG_COLOR);
-        if (!errState) printDeciValue(12, 76, deciPercent, LIVE_VALUE_COLOR, 2);
+        lcd.fillRect(12, 72, 70, 16, LIVE_BG_COLOR);
+        if (!errState) printDeciValue(12, 72, deciPercent, LIVE_VALUE_COLOR, LIVE_BG_COLOR, &fonts::DejaVu18);
         lastDispDeciPercent = deciPercent;
         int barWidth = (int)((uint32_t)data.centiPercent * 120UL / 10000UL);
-        tft.fillRect(5, 117, barWidth, 10, LIVE_VALUE_COLOR);
-        tft.fillRect(5 + barWidth, 117, 120 - barWidth, 10, LIVE_BG_COLOR);
+        lcd.fillRect(5, 117, barWidth, 10, LIVE_VALUE_COLOR);
+        lcd.fillRect(5 + barWidth, 117, 120 - barWidth, 10, LIVE_BG_COLOR);
     }
 
     lastDispErrorState = errState;
-    updateHoldIfChanged(36, 98, data.holdActive);
+    updateHoldIfChanged(36, 92, data.holdActive);
 }
 
 // ============================================================================
@@ -286,9 +402,9 @@ void displayUpdateLiveFull(const LiveData& data, const DeviceConfig& cfg) {
 void displaySetupLiveClean(const DeviceConfig& cfg) {
     activeLang = cfg.language;
     resetDisplayHysteresis();
-    tft.fillScreen(LIVE_BG_COLOR);
+    lcd.fillScreen(LIVE_BG_COLOR);
     // Curve name at top
-    drawCurveName(4, 2, cfg.curveIndex, LIVE_FG_COLOR, 2);
+    drawCurveName(12, 2, cfg.curveIndex, LIVE_FG_COLOR, LIVE_BG_COLOR);
     lastDispCurveIndex = cfg.curveIndex;
 }
 
@@ -298,33 +414,51 @@ void displayUpdateLiveClean(const LiveData& data, const DeviceConfig& cfg) {
     uint16_t deciPercent = (uint16_t)(data.centiPercent / 10u);
 
     // Curve name
-    updateCurveIfChanged(4, 2, cfg.curveIndex, 120);
+    updateCurveIfChanged(12, 2, cfg.curveIndex, 120);
 
     if (deciPercent != lastDispDeciPercent || errState != lastDispErrorState) {
-        // Large centered percentage — textSize(3) char is 18×24px
-        tft.fillRect(0, 44, SCREEN_WIDTH, 36, LIVE_BG_COLOR);
+        // Large centered percentage
+        lcd.fillRect(0, 52, SCREEN_WIDTH, 40, LIVE_BG_COLOR);
         if (errState) {
-            printSensorStatus(20, 52, data, 3);
+            printSensorStatus(4, 52, data, LIVE_BG_COLOR, &fonts::DejaVu40);
         } else {
+
+            lcd.setFont(&fonts::DejaVu40);
+            lcd.setTextColor(LIVE_VALUE_COLOR, LIVE_BG_COLOR);
             int16_t txtwidth;
             // "XX.X%" — estimate width: ~5 chars × 18px = 90px
             if (deciPercent<= 99) {
-                txtwidth = 72;
+                txtwidth = 2 * 22 +28;
             } else if (deciPercent<= 999) {
-                txtwidth = 90;
+                txtwidth = 3 * 22 +28;
             } else {
-                txtwidth = 108;
+                txtwidth = 4 * 22 +28;
             }
             int16_t tx = (SCREEN_WIDTH - txtwidth) / 2;
-            if (tx < 4) tx = 4;
-            printDeciValue(tx, 52, deciPercent, LIVE_VALUE_COLOR, 3);
-            tft.print(str(STR_PERCENT));
+            if (tx < 4) tx = 2;
+           
+            lcd.setCursor(tx, 52);
+            lcd.print((deciPercent) / 10u);
+            lcd.print(str(STR_PERCENT));
+            //int16_t txtwidth;
+            //// "XX.X%" — estimate width: ~5 chars × 18px = 90px
+            //if (deciPercent<= 99) {
+            //    txtwidth = 4 * 22;
+            //} else if (deciPercent<= 999) {
+            //    txtwidth = 5 * 22;
+            //} else {
+            //    txtwidth = 6 * 22;
+            //}
+            //int16_t tx = (SCREEN_WIDTH - txtwidth) / 2;
+            //if (tx < 4) tx = 4;
+            //printDeciValue(tx, 52, deciPercent, LIVE_VALUE_COLOR, LIVE_BG_COLOR, &fonts::DejaVu24);
+            //lcd.print(str(STR_PERCENT));
         }
         lastDispDeciPercent = deciPercent;
         lastDispErrorState = errState;
     }
 
-    updateHoldIfChanged(36, 108, data.holdActive);
+    updateHoldIfChanged(36, 104, data.holdActive);
 }
 
 // ============================================================================
@@ -348,8 +482,8 @@ static void drawArcSegment(float startDeg, float endDeg,
         int16_t iy2 = cy + (int16_t)(innerR * sin2);
         int16_t ox2 = cx + (int16_t)(outerR * cos2);
         int16_t oy2 = cy + (int16_t)(outerR * sin2);
-        tft.fillTriangle(ix1, iy1, ox1, oy1, ox2, oy2, color);
-        tft.fillTriangle(ix1, iy1, ix2, iy2, ox2, oy2, color);
+        lcd.fillTriangle(ix1, iy1, ox1, oy1, ox2, oy2, color);
+        lcd.fillTriangle(ix1, iy1, ix2, iy2, ox2, oy2, color);
     }
 }
 
@@ -372,28 +506,28 @@ static void drawArcBorders() {
         int16_t oy1 = ARC_CY + (int16_t)((ARC_OUTER_R + 1) * sin(a1));
         int16_t ox2 = ARC_CX + (int16_t)((ARC_OUTER_R + 1) * cos(a2));
         int16_t oy2 = ARC_CY + (int16_t)((ARC_OUTER_R + 1) * sin(a2));
-        tft.drawLine(ox1, oy1, ox2, oy2, bc);
+        lcd.drawLine(ox1, oy1, ox2, oy2, bc);
 
         // Outer border inline fill
         ox1 = ARC_CX + (int16_t)((ARC_OUTER_R + 0.5) * cos(a1));
         oy1 = ARC_CY + (int16_t)((ARC_OUTER_R + 0.5) * sin(a1));
         ox2 = ARC_CX + (int16_t)((ARC_OUTER_R + 0.5) * cos(a2));
         oy2 = ARC_CY + (int16_t)((ARC_OUTER_R + 0.5) * sin(a2));
-        tft.drawLine(ox1, oy1, ox2, oy2, smoothbc);
+        lcd.drawLine(ox1, oy1, ox2, oy2, smoothbc);
 
         // Inner border line
         int16_t ix1 = ARC_CX + (int16_t)((ARC_INNER_R - 1) * cos(a1));
         int16_t iy1 = ARC_CY + (int16_t)((ARC_INNER_R - 1) * sin(a1));
         int16_t ix2 = ARC_CX + (int16_t)((ARC_INNER_R - 1) * cos(a2));
         int16_t iy2 = ARC_CY + (int16_t)((ARC_INNER_R - 1) * sin(a2));
-        tft.drawLine(ix1, iy1, ix2, iy2, bc);
+        lcd.drawLine(ix1, iy1, ix2, iy2, bc);
 
         // Inner border line
         ix1 = ARC_CX + (int16_t)((ARC_INNER_R - 0.5) * cos(a1));
         iy1 = ARC_CY + (int16_t)((ARC_INNER_R - 0.5) * sin(a1));
         ix2 = ARC_CX + (int16_t)((ARC_INNER_R - 0.5) * cos(a2));
         iy2 = ARC_CY + (int16_t)((ARC_INNER_R - 0.5) * sin(a2));
-        tft.drawLine(ix1, iy1, ix2, iy2, smoothbc);
+        lcd.drawLine(ix1, iy1, ix2, iy2, smoothbc);
     }
 
     // End caps — lines from inner to outer at start and end angles
@@ -404,18 +538,18 @@ static void drawArcBorders() {
     int16_t si_y = ARC_CY + (int16_t)((ARC_INNER_R - 1) * sin(sa));
     int16_t so_x = ARC_CX + (int16_t)((ARC_OUTER_R + 1) * cos(sa));
     int16_t so_y = ARC_CY + (int16_t)((ARC_OUTER_R + 1) * sin(sa));
-    tft.drawLine(si_x, si_y, so_x, so_y, bc);
+    lcd.drawLine(si_x, si_y, so_x, so_y, bc);
 
     int16_t ei_x = ARC_CX + (int16_t)((ARC_INNER_R - 1) * cos(ea));
     int16_t ei_y = ARC_CY + (int16_t)((ARC_INNER_R - 1) * sin(ea));
     int16_t eo_x = ARC_CX + (int16_t)((ARC_OUTER_R + 1) * cos(ea));
     int16_t eo_y = ARC_CY + (int16_t)((ARC_OUTER_R + 1) * sin(ea));
-    tft.drawLine(ei_x, ei_y, eo_x, eo_y, bc);
+    lcd.drawLine(ei_x, ei_y, eo_x, eo_y, bc);
 }
 
 void displaySetupLiveBar() {
     resetDisplayHysteresis();
-    tft.fillScreen(LIVE_BG_COLOR);
+    lcd.fillScreen(LIVE_BG_COLOR);
     prevArcPercent = 0xFFFF;
 
     // Empty gauge track
@@ -429,7 +563,7 @@ void displayUpdateLiveBar(const LiveData& data, const DeviceConfig& cfg) {
     uint16_t pct = data.centiPercent;
 
     // Curve name at top
-    updateCurveIfChanged(4, 2, cfg.curveIndex, 120);
+    updateCurveIfChanged(16, 2, cfg.curveIndex, 120);
 
     uint16_t quantized = pct / 100;
     uint16_t prevQuantized = (prevArcPercent == 0xFFFF) ? 0xFFFF : prevArcPercent / 100;
@@ -454,22 +588,23 @@ void displayUpdateLiveBar(const LiveData& data, const DeviceConfig& cfg) {
     }
 
     // Center percentage text
-    tft.fillRect(ARC_CX - 30, ARC_CY - 8, 60, 20, LIVE_BG_COLOR);
+    lcd.fillRect(ARC_CX - 30, ARC_CY - 8, 60, 20, LIVE_BG_COLOR);
     uint8_t errState = getErrorState(data);
     if (errState) {
-        printSensorStatus(ARC_CX - 24, ARC_CY - 8, data, 2);
+        printSensorStatus(ARC_CX - 16, ARC_CY - 4, data, LIVE_BG_COLOR);
     } else {
-        tft.setTextColor(LIVE_FG_COLOR); tft.setTextSize(2);
+        lcd.setFont(&fonts::DejaVu18);
+        lcd.setTextColor(LIVE_FG_COLOR, LIVE_BG_COLOR);
         uint16_t intPct = pct / 100;
-        int16_t tx = (intPct < 10) ? ARC_CX - 6 :
-                     (intPct < 100) ? ARC_CX - 12 : ARC_CX - 18;
-        tft.setCursor(tx, ARC_CY - 8);
-        tft.print(intPct);
-        tft.print(str(STR_PERCENT));
+        int16_t tx = (intPct < 10) ? ARC_CX - 10 :
+                     (intPct < 100) ? ARC_CX - 16 : ARC_CX - 24;
+        lcd.setCursor(tx, ARC_CY - 8);
+        lcd.print(intPct);
+        lcd.print(str(STR_PERCENT));
     }
 
     // Hold at bottom, below the arc
-    updateHoldIfChanged(40, 114, data.holdActive);
+    updateHoldIfChanged(36, 104, data.holdActive);
 }
 
 // ============================================================================
@@ -477,13 +612,13 @@ void displayUpdateLiveBar(const LiveData& data, const DeviceConfig& cfg) {
 // ============================================================================
 void displaySetupLiveDark() {
     resetDisplayHysteresis();
-    tft.fillScreen(LIVE_BG_COLOR);
+    lcd.fillScreen(LIVE_BG_COLOR);
 }
 
 void displayShowCurveOverlay(uint8_t curveIndex) {
     // Clear overlay area and draw curve name — centered vertically
-    tft.fillRect(0, 44, SCREEN_WIDTH, 40, LIVE_BG_COLOR);
-    drawCurveName(4, 52, curveIndex, LIVE_VALUE_COLOR, 2);
+    lcd.fillRect(0, 44, SCREEN_WIDTH, 40, LIVE_BG_COLOR);
+    drawCurveName(16, 52, curveIndex, LIVE_FG_COLOR, LIVE_BG_COLOR);
 }
 
 void displayUpdateLiveDark(const LiveData& data, uint8_t language) {
@@ -492,8 +627,8 @@ void displayUpdateLiveDark(const LiveData& data, uint8_t language) {
 
     // Error overlay in upper area (won't conflict with curve overlay zone)
     if (errState != lastDispErrorState) {
-        tft.fillRect(0, 8, SCREEN_WIDTH, 20, LIVE_BG_COLOR);
-        if (errState) printSensorStatus(20, 10, data, 2);
+        lcd.fillRect(0, 24, SCREEN_WIDTH, 24, LIVE_BG_COLOR);
+        if (errState) printSensorStatus(24, 24, data, LIVE_BG_COLOR, &fonts::DejaVu24);
         lastDispErrorState = errState;
     }
 
@@ -503,7 +638,7 @@ void displayUpdateLiveDark(const LiveData& data, uint8_t language) {
     } else {
         if (lastDispHoldInit && lastDispHold) {
             // Was showing HOLD, now clear it
-            tft.fillRect(36, 96, 56, 16, LIVE_BG_COLOR);
+            lcd.fillRect(36, 96, 60, 20, LIVE_BG_COLOR);
         }
         lastDispHold = false;
         lastDispHoldInit = true;
@@ -515,7 +650,7 @@ void displayUpdateLiveDark(const LiveData& data, uint8_t language) {
 // ============================================================================
 void displayUpdateHoldIndicator(bool holdActive, uint8_t language) {
     activeLang = language;
-    drawHoldIndicator(36, 98, holdActive);
+    drawHoldIndicator(36, 90, holdActive);
     lastDispHold = holdActive;
     lastDispHoldInit = true;
 }
@@ -533,28 +668,54 @@ static bool isNavBoxVisible(const UIState& ui, uint8_t index) {
 static void drawNavBox(const UIState& ui, uint8_t index, bool isSelected) {
     if (index > 3) return;
     int16_t x = NAV_BOX_X[index], y = NAV_BOX_Y[index];
-    uint16_t bg = isSelected ? NAV_SELECTED_BG : NAV_NORMAL_BG;
-    tft.fillRect(x, y, NAV_BOX_W, NAV_BOX_H, bg);
+    const AssetDesc* icon = NULL;
+
+    /*uint16_t bg = isSelected ? NAV_SELECTED_BG : NAV_NORMAL_BG;
+    lcd.fillRect(x, y, NAV_BOX_W, NAV_BOX_H, bg);
     uint16_t fg = isSelected ? NAV_SELECTED_FG : NAV_NORMAL_FG;
     int16_t cx = x + NAV_BOX_W / 2, cy = y + NAV_BOX_H / 2;
     if (ui.state == DISPLAY_EDIT_VALUE && (index == 2 || index == 3)) {
-        tft.setTextSize(2); tft.setTextColor(fg);
-        tft.setCursor(x + 10, y + 1);
-        tft.print((index == 2) ? 'S' : 'X');
+        lcd.setFont(&fonts::DejaVu18);
+        lcd.setTextColor(fg, bg);
+        lcd.setCursor(x + 10, y + 2);
+        lcd.print((index == 2) ? 'S' : 'X');
     } else {
         switch (index) {
-            case 0: tft.fillTriangle(x+NAV_BOX_W-5,cy-6, x+NAV_BOX_W-5,cy+6, x+8,cy, fg); break;
-            case 1: tft.fillTriangle(x+8,cy-6, x+8,cy+6, x+NAV_BOX_W-5,cy, fg); break;
-            case 2: tft.fillTriangle(cx-7,y+NAV_BOX_H-5, cx+7,y+NAV_BOX_H-5, cx,y+5, fg); break;
-            case 3: tft.fillTriangle(cx-7,y+5, cx+7,y+5, cx,y+NAV_BOX_H-5, fg); break;
+            case 0: lcd.fillTriangle(x+NAV_BOX_W-5,cy-6, x+NAV_BOX_W-5,cy+6, x+8,cy, fg); break;
+            case 1: lcd.fillTriangle(x+8,cy-6, x+8,cy+6, x+NAV_BOX_W-5,cy, fg); break;
+            case 2: lcd.fillTriangle(cx-7,y+NAV_BOX_H-5, cx+7,y+NAV_BOX_H-5, cx,y+5, fg); break;
+            case 3: lcd.fillTriangle(cx-7,y+5, cx+7,y+5, cx,y+NAV_BOX_H-5, fg); break;
         }
+    }*/
+
+    // Special case for edit mode S/X (keep the old text for now)
+    if (ui.state == DISPLAY_EDIT_VALUE && (index == 2 || index == 3)) {
+        uint16_t bg = isSelected ? NAV_SELECTED_BG : NAV_NORMAL_BG;
+        lcd.fillRect(x, y, NAV_BOX_W, NAV_BOX_H, bg);
+        uint16_t fg = isSelected ? NAV_SELECTED_FG : NAV_NORMAL_FG;
+        lcd.setFont(&fonts::DejaVu18); lcd.setTextColor(fg, bg); lcd.setCursor(x + 10, y + 2);
+        lcd.print((index == 2) ? 'S' : 'X');
+        return;
     }
+
+    // Normal arrow icons
+    switch (index) {
+        case 0: icon = isSelected ? &icon_nav_left_selected  : &icon_nav_left_normal;  break;
+        case 1: icon = isSelected ? &icon_nav_right_selected : &icon_nav_right_normal; break;
+        case 2: icon = isSelected ? &icon_nav_up_selected    : &icon_nav_up_normal;    break;
+        case 3: icon = isSelected ? &icon_nav_down_selected  : &icon_nav_down_normal;  break;
+    }
+
+    if (icon) {
+        lcd.pushImage(x, y, 32, 20, (const lgfx::rgb565_t*)icon->data);
+    }
+
 }
 
 void displayDrawNavBar(const UIState& ui) {
     if (ui.state == DISPLAY_LIVE) return;
-    tft.fillRect(0, NAV_BOX_Y[0], SCREEN_WIDTH, NAV_BOX_H, NAV_NORMAL_BG);
-    tft.fillRect(0, NAV_BOX_H, SCREEN_WIDTH, NAV_SEPARATOR_PX, EDIT_BG_COLOR);
+    lcd.fillRect(0, NAV_BOX_Y[0], SCREEN_WIDTH, NAV_BOX_H, NAV_NORMAL_BG);
+    lcd.fillRect(0, NAV_BOX_H, SCREEN_WIDTH, NAV_SEPARATOR_PX, EDIT_BG_COLOR);
     for (uint8_t i = 0; i < NAV_BOX_COUNT; i++)
         if (isNavBoxVisible(ui, i)) drawNavBox(ui, i, ui.menuScrollPos == i);
 }
@@ -570,12 +731,13 @@ void displayUpdateNavCursor(const UIState& ui, uint8_t prevScrollPos) {
 //  Edit Screen Utilities
 // ============================================================================
 void displayClearContentArea() {
-    tft.fillRect(0, CONTENT_Y, SCREEN_WIDTH, CONTENT_H, EDIT_BG_COLOR);
+    lcd.fillRect(0, CONTENT_Y, SCREEN_WIDTH, CONTENT_H, EDIT_BG_COLOR);
 }
 
 void displayDrawEditTitle(const char* title) {
-    tft.setTextSize(1); tft.setTextColor(EDIT_TITLE_COLOR);
-    tft.setCursor(4, CONTENT_Y + 4); tft.print(title);
+    lcd.setFont(&fonts::DejaVu9);
+    lcd.setTextColor(EDIT_TITLE_COLOR, EDIT_BG_COLOR);
+    lcd.setCursor(4, CONTENT_Y + 4); lcd.print(title);
 }
 
 // ============================================================================
@@ -587,14 +749,11 @@ void displayDrawHoldMode(const UIState& ui, const DeviceConfig& cfg) {
     displayDrawEditTitle(str(STR_TITLE_HOLD_MODE));
     bool isFW = (cfg.holdMode == HOLD_FIRMWARE);
     int16_t baseY = CONTENT_Y + 20;
-    drawButtonHighlight(4, baseY, 120, 22, ui.menuScrollPos == 4);
-    tft.setTextSize(2); tft.setTextColor(isFW ? NAV_NORMAL_FG : EDIT_VALUE_COLOR);
-    tft.setCursor(8, baseY + 3); tft.print(str(STR_GAME));
-    if (!isFW) { tft.setCursor(108, baseY + 3); tft.print("*"); }
-    drawButtonHighlight(4, baseY + 30, 120, 22, ui.menuScrollPos == 5);
-    tft.setTextColor(isFW ? EDIT_VALUE_COLOR : NAV_NORMAL_FG);
-    tft.setCursor(8, baseY + 33); tft.print(str(STR_FIRMWARE));
-    if (isFW) { tft.setCursor(108, baseY + 33); tft.print("*"); }
+
+    drawSelectableRow(4, baseY,      120, 22, str(STR_GAME),
+                    ui.menuScrollPos == 4, !isFW);
+    drawSelectableRow(4, baseY + 30, 120, 22, str(STR_FIRMWARE),
+                    ui.menuScrollPos == 5,  isFW);
 }
 
 void displayDrawDeadzones(const UIState& ui, const DeviceConfig& cfg) {
@@ -602,19 +761,19 @@ void displayDrawDeadzones(const UIState& ui, const DeviceConfig& cfg) {
     displayClearContentArea();
     displayDrawEditTitle(str(STR_TITLE_DEADZONES));
     int16_t baseY = CONTENT_Y + 16, ax = 100;
-    tft.setTextSize(1); tft.setTextColor(EDIT_LABEL_COLOR);
-    tft.setCursor(8, baseY); tft.print(str(STR_LABEL_LOW));
-    tft.setTextSize(2); tft.setCursor(8, baseY+12); tft.setTextColor(EDIT_VALUE_COLOR);
-    tft.print(cfg.deadzoneLow/10u); tft.print("."); tft.print(cfg.deadzoneLow%10u); tft.print(str(STR_PERCENT));
+    lcd.setFont(&fonts::DejaVu9); lcd.setTextColor(EDIT_LABEL_COLOR, EDIT_BG_COLOR);
+    lcd.setCursor(8, baseY); lcd.print(str(STR_LABEL_LOW));
+    lcd.setFont(&fonts::DejaVu18); lcd.setTextColor(EDIT_VALUE_COLOR, EDIT_BG_COLOR); lcd.setCursor(8, baseY+12);
+    lcd.print(cfg.deadzoneLow/10u); lcd.print("."); lcd.print(cfg.deadzoneLow%10u); lcd.print(str(STR_PERCENT));
     drawDoubleArrowUp(ax, baseY+2, (ui.menuScrollPos==4)?NAV_SELECTED_FG:NAV_NORMAL_FG);
     drawSmallArrowUp(ax+18, baseY+2, (ui.menuScrollPos==5)?NAV_SELECTED_FG:NAV_NORMAL_FG);
     drawSmallArrowDown(ax+18, baseY+18, (ui.menuScrollPos==6)?NAV_SELECTED_FG:NAV_NORMAL_FG);
     drawDoubleArrowDown(ax, baseY+18, (ui.menuScrollPos==7)?NAV_SELECTED_FG:NAV_NORMAL_FG);
     int16_t hiY = baseY + 44;
-    tft.setTextSize(1); tft.setTextColor(EDIT_LABEL_COLOR);
-    tft.setCursor(8, hiY); tft.print(str(STR_LABEL_HIGH));
-    tft.setTextSize(2); tft.setCursor(8, hiY+12); tft.setTextColor(EDIT_VALUE_COLOR);
-    tft.print(cfg.deadzoneHigh/10u); tft.print("."); tft.print(cfg.deadzoneHigh%10u); tft.print(str(STR_PERCENT));
+    lcd.setFont(&fonts::DejaVu9); lcd.setTextColor(EDIT_LABEL_COLOR, EDIT_BG_COLOR);
+    lcd.setCursor(8, hiY); lcd.print(str(STR_LABEL_HIGH));
+    lcd.setFont(&fonts::DejaVu18); lcd.setTextColor(EDIT_VALUE_COLOR, EDIT_BG_COLOR); lcd.setCursor(8, hiY+12);
+    lcd.print(cfg.deadzoneHigh/10u); lcd.print("."); lcd.print(cfg.deadzoneHigh%10u); lcd.print(str(STR_PERCENT));
     drawDoubleArrowUp(ax, hiY+2, (ui.menuScrollPos==8)?NAV_SELECTED_FG:NAV_NORMAL_FG);
     drawSmallArrowUp(ax+18, hiY+2, (ui.menuScrollPos==9)?NAV_SELECTED_FG:NAV_NORMAL_FG);
     drawSmallArrowDown(ax+18, hiY+18, (ui.menuScrollPos==10)?NAV_SELECTED_FG:NAV_NORMAL_FG);
@@ -626,8 +785,8 @@ void displayDrawDefaultCurve(const UIState& ui, const DeviceConfig& cfg) {
     displayClearContentArea();
     displayDrawEditTitle(str(STR_TITLE_DEFAULT_CURVE));
     int16_t baseY = CONTENT_Y + 30;
-    tft.setTextSize(2); tft.setTextColor(EDIT_VALUE_COLOR); tft.setCursor(8, baseY+10);
-    if (cfg.curveIndex < NUM_CURVES) tft.print(CURVE_NAMES[cfg.curveIndex]);
+    lcd.setFont(&fonts::DejaVu18); lcd.setTextColor(EDIT_VALUE_COLOR, EDIT_BG_COLOR); lcd.setCursor(8, baseY+10);
+    if (cfg.curveIndex < NUM_CURVES) lcd.print(CURVE_NAMES[cfg.curveIndex]);
     drawSmallArrowUp(108, baseY, (ui.menuScrollPos==4)?NAV_SELECTED_FG:NAV_NORMAL_FG);
     drawSmallArrowDown(108, baseY+22, (ui.menuScrollPos==5)?NAV_SELECTED_FG:NAV_NORMAL_FG);
 }
@@ -637,8 +796,8 @@ void displayDrawSnapThreshold(const UIState& ui, const DeviceConfig& cfg) {
     displayClearContentArea();
     displayDrawEditTitle(str(STR_TITLE_SNAP_THRESH));
     int16_t baseY = CONTENT_Y + 24;
-    tft.setTextSize(2); tft.setTextColor(EDIT_VALUE_COLOR); tft.setCursor(8, baseY+10);
-    tft.print(cfg.snapThreshold/10u); tft.print("."); tft.print(cfg.snapThreshold%10u); tft.print(str(STR_PERCENT));
+    lcd.setFont(&fonts::DejaVu18); lcd.setTextColor(EDIT_VALUE_COLOR, EDIT_BG_COLOR); lcd.setCursor(8, baseY+10);
+    lcd.print(cfg.snapThreshold/10u); lcd.print("."); lcd.print(cfg.snapThreshold%10u); lcd.print(str(STR_PERCENT));
     int16_t ax = 100;
     drawDoubleArrowUp(ax, baseY, (ui.menuScrollPos==4)?NAV_SELECTED_FG:NAV_NORMAL_FG);
     drawSmallArrowUp(ax+18, baseY, (ui.menuScrollPos==5)?NAV_SELECTED_FG:NAV_NORMAL_FG);
@@ -651,8 +810,8 @@ void displayDrawButtonDebounce(const UIState& ui, const DeviceConfig& cfg) {
     displayClearContentArea();
     displayDrawEditTitle(str(STR_TITLE_DEBOUNCE));
     int16_t baseY = CONTENT_Y + 24;
-    tft.setTextSize(2); tft.setTextColor(EDIT_VALUE_COLOR); tft.setCursor(8, baseY+10);
-    tft.print(cfg.debounceMs); tft.print(" "); tft.print(str(STR_LABEL_MS));
+    lcd.setFont(&fonts::DejaVu18); lcd.setTextColor(EDIT_VALUE_COLOR, EDIT_BG_COLOR); lcd.setCursor(8, baseY+10);
+    lcd.print(cfg.debounceMs); lcd.print(" "); lcd.print(str(STR_LABEL_MS));
     drawSmallArrowUp(108, baseY, (ui.menuScrollPos==4)?NAV_SELECTED_FG:NAV_NORMAL_FG);
     drawSmallArrowDown(108, baseY+22, (ui.menuScrollPos==5)?NAV_SELECTED_FG:NAV_NORMAL_FG);
 }
@@ -662,17 +821,17 @@ void displayDrawRefreshRates(const UIState& ui, const DeviceConfig& cfg) {
     displayClearContentArea();
     displayDrawEditTitle(str(STR_TITLE_REFRESH));
     int16_t baseY = CONTENT_Y + 16, ax = 100;
-    tft.setTextSize(1); tft.setTextColor(EDIT_LABEL_COLOR);
-    tft.setCursor(8, baseY); tft.print(str(STR_LABEL_USB_ADC));
-    tft.setTextSize(2); tft.setCursor(8, baseY+12); tft.setTextColor(EDIT_VALUE_COLOR);
-    tft.print(cfg.sampleRateHz); tft.print(str(STR_LABEL_HZ));
+    lcd.setFont(&fonts::DejaVu9); lcd.setTextColor(EDIT_LABEL_COLOR, EDIT_BG_COLOR);
+    lcd.setCursor(8, baseY); lcd.print(str(STR_LABEL_USB_ADC));
+    lcd.setFont(&fonts::DejaVu12); lcd.setTextColor(EDIT_VALUE_COLOR, EDIT_BG_COLOR); lcd.setCursor(8, baseY+12);
+    lcd.print(cfg.sampleRateHz); lcd.print(str(STR_LABEL_HZ));
     drawSmallArrowUp(ax, baseY+2, (ui.menuScrollPos==4)?NAV_SELECTED_FG:NAV_NORMAL_FG);
     drawSmallArrowDown(ax, baseY+18, (ui.menuScrollPos==5)?NAV_SELECTED_FG:NAV_NORMAL_FG);
     int16_t dY = baseY + 44;
-    tft.setTextSize(1); tft.setTextColor(EDIT_LABEL_COLOR);
-    tft.setCursor(8, dY); tft.print(str(STR_LABEL_DISPLAY));
-    tft.setTextSize(2); tft.setCursor(8, dY+12); tft.setTextColor(EDIT_VALUE_COLOR);
-    tft.print(cfg.displayRateHz); tft.print(str(STR_LABEL_HZ));
+    lcd.setFont(&fonts::DejaVu9); lcd.setTextColor(EDIT_LABEL_COLOR, EDIT_BG_COLOR);
+    lcd.setCursor(8, dY); lcd.print(str(STR_LABEL_DISPLAY));
+    lcd.setFont(&fonts::DejaVu12); lcd.setTextColor(EDIT_VALUE_COLOR, EDIT_BG_COLOR); lcd.setCursor(8, dY+12);
+    lcd.print(cfg.displayRateHz); lcd.print(str(STR_LABEL_HZ));
     drawSmallArrowUp(ax, dY+2, (ui.menuScrollPos==6)?NAV_SELECTED_FG:NAV_NORMAL_FG);
     drawSmallArrowDown(ax, dY+18, (ui.menuScrollPos==7)?NAV_SELECTED_FG:NAV_NORMAL_FG);
 }
@@ -685,58 +844,58 @@ void displayDrawCalibrate(const UIState& ui, const CalibData& calib, uint8_t lan
     switch (calib.state) {
         case CALIB_IDLE: case CALIB_PROMPT_ZERO: {
             uint16_t col = (calib.state==CALIB_IDLE) ? EDIT_LABEL_COLOR : LIVE_WARN_COLOR;
-            tft.setTextSize(1); tft.setTextColor(col);
-            tft.setCursor(8, baseY+10); tft.print(str(STR_CAL_PUSH_DOWN));
-            tft.setCursor(8, baseY+26); tft.print(str(STR_CAL_HOLD_STEADY));
+            lcd.setFont(&fonts::DejaVu9); lcd.setTextColor(col, EDIT_BG_COLOR);
+            lcd.setCursor(8, baseY+10); lcd.print(str(STR_CAL_PUSH_DOWN));
+            lcd.setCursor(8, baseY+26); lcd.print(str(STR_CAL_HOLD_STEADY));
             break; }
         case CALIB_SETTLING_ZERO: case CALIB_SETTLING_MAX:
-            tft.setTextSize(1); tft.setTextColor(LIVE_VALUE_COLOR);
-            tft.setCursor(8, baseY+10); tft.print(str(STR_CAL_SETTLING));
-            tft.setCursor(8, baseY+26); tft.print(str(STR_CAL_HOLD_STEADY));
-            tft.setTextColor(EDIT_LABEL_COLOR); tft.setCursor(8, baseY+48);
-            tft.print(calib.settleStableCount); tft.print("/"); tft.print(CALIB_STABILITY_COUNT);
+            lcd.setFont(&fonts::DejaVu9); lcd.setTextColor(LIVE_VALUE_COLOR, EDIT_BG_COLOR);
+            lcd.setCursor(8, baseY+10); lcd.print(str(STR_CAL_SETTLING));
+            lcd.setCursor(8, baseY+26); lcd.print(str(STR_CAL_HOLD_STEADY));
+            lcd.setTextColor(EDIT_LABEL_COLOR, EDIT_BG_COLOR); lcd.setCursor(8, baseY+48);
+            lcd.print(calib.settleStableCount); lcd.print("/"); lcd.print(CALIB_STABILITY_COUNT);
             break;
         case CALIB_SAMPLING_ZERO: case CALIB_SAMPLING_MAX: {
-            tft.setTextSize(1); tft.setTextColor(LIVE_VALUE_COLOR);
-            tft.setCursor(8, baseY+10); tft.print(str(STR_CAL_SAMPLING));
+            lcd.setFont(&fonts::DejaVu9); lcd.setTextColor(LIVE_VALUE_COLOR, EDIT_BG_COLOR);
+            lcd.setCursor(8, baseY+10); lcd.print(str(STR_CAL_SAMPLING));
             int16_t barW = (int16_t)((uint32_t)calib.sampleCount * 100UL / CALIB_SAMPLE_COUNT);
-            tft.fillRect(8, baseY+30, barW, 10, LIVE_VALUE_COLOR);
-            tft.fillRect(8+barW, baseY+30, 100-barW, 10, NAV_NORMAL_BG);
-            tft.setTextColor(EDIT_LABEL_COLOR); tft.setCursor(8, baseY+48);
-            tft.print(calib.sampleCount); tft.print("/"); tft.print(CALIB_SAMPLE_COUNT);
+            lcd.fillRect(8, baseY+30, barW, 10, LIVE_VALUE_COLOR);
+            lcd.fillRect(8+barW, baseY+30, 100-barW, 10, NAV_NORMAL_BG);
+            lcd.setTextColor(EDIT_LABEL_COLOR, EDIT_BG_COLOR); lcd.setCursor(8, baseY+48);
+            lcd.print(calib.sampleCount); lcd.print("/"); lcd.print(CALIB_SAMPLE_COUNT);
             break; }
         case CALIB_RESULT_ZERO:
-            tft.setTextSize(1); tft.setTextColor(LIVE_OK_COLOR);
-            tft.setCursor(8, baseY+10); tft.print(str(STR_CAL_ZERO_OK));
-            printDeciValue(8, baseY+24, calib.resultCentiVolts/10, EDIT_VALUE_COLOR, 2);
-            tft.setTextSize(1); tft.setCursor(80, baseY+28); tft.print(str(STR_VOLTS));
-//            tft.setTextColor(EDIT_LABEL_COLOR); tft.setCursor(8, baseY+50); tft.print(str(STR_CAL_RETRY));
+            lcd.setFont(&fonts::DejaVu9); lcd.setTextColor(LIVE_OK_COLOR, EDIT_BG_COLOR);
+            lcd.setCursor(8, baseY+10); lcd.print(str(STR_CAL_ZERO_OK));
+            printDeciValue(8, baseY+24, calib.resultCentiVolts/10, EDIT_VALUE_COLOR, EDIT_BG_COLOR, &fonts::DejaVu18);
+            lcd.setFont(&fonts::DejaVu9); lcd.setCursor(80, baseY+28); lcd.print(str(STR_VOLTS));
+//            lcd.setTextColor(EDIT_LABEL_COLOR); lcd.setCursor(8, baseY+50); lcd.print(str(STR_CAL_RETRY));
             break;
         case CALIB_PROMPT_MAX:
-            tft.setTextSize(1); tft.setTextColor(LIVE_WARN_COLOR);
-            tft.setCursor(8, baseY+10); tft.print(str(STR_CAL_PULL_UP));
-            tft.setCursor(8, baseY+26); tft.print(str(STR_CAL_HOLD_STEADY));
+            lcd.setFont(&fonts::DejaVu9); lcd.setTextColor(LIVE_WARN_COLOR, EDIT_BG_COLOR);
+            lcd.setCursor(8, baseY+10); lcd.print(str(STR_CAL_PULL_UP));
+            lcd.setCursor(8, baseY+26); lcd.print(str(STR_CAL_HOLD_STEADY));
             break;
         case CALIB_RESULT_MAX:
-            tft.setTextSize(1); tft.setTextColor(LIVE_OK_COLOR);
-            tft.setCursor(8, baseY+10); tft.print(str(STR_CAL_MAX_OK));
-            printDeciValue(8, baseY+24, calib.resultCentiVolts/10, EDIT_VALUE_COLOR, 2);
-            tft.setTextSize(1); tft.setCursor(80, baseY+28); tft.print(str(STR_VOLTS));
-//            tft.setTextColor(EDIT_LABEL_COLOR); tft.setCursor(8, baseY+50); tft.print(str(STR_CAL_RETRY));
+            lcd.setFont(&fonts::DejaVu9); lcd.setTextColor(LIVE_OK_COLOR, EDIT_BG_COLOR);
+            lcd.setCursor(8, baseY+10); lcd.print(str(STR_CAL_MAX_OK));
+            printDeciValue(8, baseY+24, calib.resultCentiVolts/10, EDIT_VALUE_COLOR, EDIT_BG_COLOR, &fonts::DejaVu18);
+            lcd.setFont(&fonts::DejaVu9); lcd.setCursor(80, baseY+28); lcd.print(str(STR_VOLTS));
+//            lcd.setTextColor(EDIT_LABEL_COLOR); lcd.setCursor(8, baseY+50); lcd.print(str(STR_CAL_RETRY));
             break;
         case CALIB_DONE:
-            tft.setTextSize(1); tft.setTextColor(LIVE_OK_COLOR);
-            tft.setCursor(8, baseY+10); tft.print(str(STR_CAL_DONE));
-            tft.setTextColor(EDIT_LABEL_COLOR);
-            tft.setCursor(8, baseY+28); tft.print(str(STR_CAL_ZERO_OK)); tft.print(" ADC "); tft.print(calib.resultAdcZero);
-            tft.setCursor(8, baseY+42); tft.print(str(STR_CAL_MAX_OK)); tft.print(" ADC "); tft.print(calib.resultAdcMax);
+            lcd.setFont(&fonts::DejaVu9); lcd.setTextColor(LIVE_OK_COLOR, EDIT_BG_COLOR);
+            lcd.setCursor(8, baseY+10); lcd.print(str(STR_CAL_DONE));
+            lcd.setTextColor(EDIT_LABEL_COLOR, EDIT_BG_COLOR);
+            lcd.setCursor(8, baseY+28); lcd.print(str(STR_CAL_ZERO_OK)); lcd.print(" ADC "); lcd.print(calib.resultAdcZero);
+            lcd.setCursor(8, baseY+42); lcd.print(str(STR_CAL_MAX_OK)); lcd.print(" ADC "); lcd.print(calib.resultAdcMax);
             break;
         case CALIB_ERROR:
-            tft.setTextSize(2); tft.setTextColor(LIVE_ERROR_COLOR);
-            tft.setCursor(8, baseY+10); tft.print(str(STR_CAL_ERROR));
-            tft.setTextSize(1); tft.setTextColor(LIVE_WARN_COLOR);
-            tft.setCursor(8, baseY+34); if (calib.errorMsg) tft.print(calib.errorMsg);
-//            tft.setTextColor(EDIT_LABEL_COLOR); tft.setCursor(8, baseY+52); tft.print(str(STR_CAL_RETRY));
+            lcd.setFont(&fonts::DejaVu18); lcd.setTextColor(LIVE_ERROR_COLOR, EDIT_BG_COLOR);
+            lcd.setCursor(8, baseY+10); lcd.print(str(STR_CAL_ERROR));
+            lcd.setFont(&fonts::DejaVu9); lcd.setTextColor(LIVE_WARN_COLOR, EDIT_BG_COLOR);
+            lcd.setCursor(8, baseY+34); if (calib.errorMsg) lcd.print(calib.errorMsg);
+//            lcd.setTextColor(EDIT_LABEL_COLOR); lcd.setCursor(8, baseY+52); lcd.print(str(STR_CAL_RETRY));
             break;
     }
     // Draw Redo and Next buttons at the bottom of the content area
@@ -745,13 +904,13 @@ void displayDrawCalibrate(const UIState& ui, const CalibData& calib, uint8_t lan
         int16_t btnY = SCREEN_HEIGHT - 20;
         // Redo button
         drawButtonHighlight(4, btnY, 56, 16, ui.menuScrollPos == 4);
-        tft.setTextSize(1);
-        tft.setTextColor((ui.menuScrollPos == 4) ? NAV_SELECTED_FG : EDIT_LABEL_COLOR);
-        tft.setCursor(12, btnY + 4); tft.print(str(STR_CAL_REDO));
+        lcd.setFont(&fonts::DejaVu12);
+        lcd.setTextColor((ui.menuScrollPos == 4) ? NAV_SELECTED_FG : EDIT_LABEL_COLOR, EDIT_BG_COLOR);
+        lcd.setCursor(12, btnY + 4); lcd.print(str(STR_CAL_REDO));
         // Next button
         drawButtonHighlight(66, btnY, 56, 16, ui.menuScrollPos == 5);
-        tft.setTextColor((ui.menuScrollPos == 5) ? NAV_SELECTED_FG : EDIT_LABEL_COLOR);
-        tft.setCursor(76, btnY + 4); tft.print(str(STR_CAL_NEXT));
+        lcd.setTextColor((ui.menuScrollPos == 5) ? NAV_SELECTED_FG : EDIT_LABEL_COLOR, EDIT_BG_COLOR);
+        lcd.setCursor(76, btnY + 4); lcd.print(str(STR_CAL_NEXT));
     }
 }
 
@@ -761,38 +920,58 @@ void displayDrawSaveLoad(const UIState& ui, uint8_t selectedSlot,
     displayClearContentArea();
     displayDrawEditTitle(str(STR_TITLE_SAVE_LOAD));
     int16_t baseY = CONTENT_Y + 16;
+
     for (uint8_t i = 0; i < NUM_NVS_PROFILES; i++) {
-        int16_t slotY = baseY + i * 14;
-        bool isSel = (ui.menuScrollPos == (4+i));
-        drawButtonHighlight(4, slotY, 120, 16, isSel);
-        tft.setTextSize(1); tft.setTextColor(isSel ? NAV_SELECTED_FG : EDIT_LABEL_COLOR);
-        tft.setCursor(8, slotY+4); tft.print(str(STR_PROFILE)); tft.print(" "); tft.print(i+1); tft.print(": ");
-        if (slotExists[i]) { tft.setTextColor(isSel?NAV_SELECTED_FG:LIVE_OK_COLOR); tft.print(str(STR_SAVED)); }
-        else { tft.setTextColor(isSel?NAV_SELECTED_FG:NAV_NORMAL_FG); tft.print(str(STR_EMPTY)); }
+        char label[16];
+        snprintf(label, sizeof(label), "%s %u: ", str(STR_PROFILE), i + 1);
+
+        drawSelectableRowStatus(
+            4, baseY + i * 14, 120, 16, label,
+            slotExists[i] ? str(STR_SAVED) : str(STR_EMPTY),
+            slotExists[i] ? LIVE_OK_COLOR  : NAV_NORMAL_FG,
+            ui.menuScrollPos == (4 + i)
+        );
     }
+    //for (uint8_t i = 0; i < NUM_NVS_PROFILES; i++) {
+    //    int16_t slotY = baseY + i * 14;
+    //    bool isSel = (ui.menuScrollPos == (4+i));
+    //    drawButtonHighlight(4, slotY, 120, 16, isSel);
+    //    lcd.setFont(&fonts::DejaVu9); lcd.setTextColor(isSel ? NAV_SELECTED_FG : EDIT_LABEL_COLOR, EDIT_BG_COLOR);
+    //    lcd.setCursor(8, slotY+4); lcd.print(str(STR_PROFILE)); lcd.print(" "); lcd.print(i+1); lcd.print(": ");
+    //    if (slotExists[i]) { lcd.setTextColor(isSel?NAV_SELECTED_FG:LIVE_OK_COLOR, EDIT_BG_COLOR); lcd.print(str(STR_SAVED)); }
+    //    else { lcd.setTextColor(isSel?NAV_SELECTED_FG:NAV_NORMAL_FG, EDIT_BG_COLOR); lcd.print(str(STR_EMPTY)); }
+    //}
     int16_t actY = baseY + NUM_NVS_PROFILES*14 + 4;
     uint8_t sb = 4+NUM_NVS_PROFILES, lb = sb+1;
     drawButtonHighlight(4, actY, 56, 16, ui.menuScrollPos==sb);
-    tft.setTextSize(1); tft.setTextColor((ui.menuScrollPos==sb)?NAV_SELECTED_FG:EDIT_LABEL_COLOR);
-    tft.setCursor(12, actY+4); tft.print(str(STR_SAVE));
+    lcd.setFont(&fonts::DejaVu9); lcd.setTextColor((ui.menuScrollPos==sb)?NAV_SELECTED_FG:EDIT_LABEL_COLOR, (ui.menuScrollPos==sb)?NAV_SELECTED_BG:EDIT_BG_COLOR);
+    lcd.setCursor(12, actY+4); lcd.print(str(STR_SAVE));
     drawButtonHighlight(66, actY, 56, 16, ui.menuScrollPos==lb);
-    tft.setTextColor((ui.menuScrollPos==lb)?NAV_SELECTED_FG:EDIT_LABEL_COLOR);
-    tft.setCursor(76, actY+4); tft.print(str(STR_LOAD));
+    lcd.setTextColor((ui.menuScrollPos==lb)?NAV_SELECTED_FG:EDIT_LABEL_COLOR, (ui.menuScrollPos==lb)?NAV_SELECTED_BG:EDIT_BG_COLOR);
+    lcd.setCursor(76, actY+4); lcd.print(str(STR_LOAD));
 }
 
 void displayDrawLanguage(const UIState& ui, uint8_t currentLanguage) {
     displayClearContentArea();
     displayDrawEditTitle(str(STR_TITLE_LANGUAGE));
     int16_t baseY = CONTENT_Y + 20;
+
     for (uint8_t i = 0; i < NUM_LANGUAGES; i++) {
-        int16_t slotY = baseY + i * 22;
-        bool isSel = (ui.menuScrollPos == (4+i));
-        bool isCur = (i == currentLanguage);
-        drawButtonHighlight(4, slotY, 120, 20, isSel);
-        tft.setTextSize(2); tft.setTextColor(isCur ? EDIT_VALUE_COLOR : NAV_NORMAL_FG);
-        tft.setCursor(8, slotY+2); tft.print(LANG_NAMES[i]);
-        if (isCur) { tft.setCursor(108, slotY+2); tft.print("*"); }
+    drawSelectableRow(4, baseY + i * 22, 120, 20, LANG_NAMES[i],
+                      ui.menuScrollPos == (4 + i),
+                      i == currentLanguage,
+                      &fonts::DejaVu12);
     }
+
+    //for (uint8_t i = 0; i < NUM_LANGUAGES; i++) {
+    //    int16_t slotY = baseY + i * 22;
+    //    bool isSel = (ui.menuScrollPos == (4+i));
+    //    bool isCur = (i == currentLanguage);
+    //    drawButtonHighlight(4, slotY, 120, 20, isSel);
+    //    lcd.setFont(&fonts::DejaVu12); lcd.setTextColor(isCur ? EDIT_VALUE_COLOR : NAV_NORMAL_FG, EDIT_BG_COLOR);
+    //    lcd.setCursor(8, slotY+2); lcd.print(LANG_NAMES[i]);
+    //    if (isCur) { lcd.setCursor(108, slotY+2); lcd.print("*"); }
+    //}
 }
 
 void displayDrawEditScreen(const UIState& ui, const DeviceConfig& cfg, const LiveData& data) {

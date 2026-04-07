@@ -55,6 +55,47 @@ static DeviceConfig pendingConfig;
 static volatile bool configDirty = false;
 
 // ============================================================================
+//  HID sampling rate monitor — pure integer math
+// ============================================================================
+void monitorHIDRate(uint32_t now_us) {
+    static uint32_t last_us       = 0;
+    static uint32_t deviant_count = 0;
+    static uint32_t min_period    = 1000;
+    static uint32_t max_period    = 1000;
+    static uint32_t sample_count  = 0;
+
+    if (last_us == 0) {
+        last_us = now_us;
+        return;
+    }
+
+    uint32_t delta_us = now_us - last_us;
+    last_us = now_us;
+
+    if (delta_us < 900 || delta_us > 1100) {
+        deviant_count++;
+    }
+
+    if (delta_us < min_period) min_period = delta_us;
+    if (delta_us > max_period) max_period = delta_us;
+
+    sample_count++;
+
+    if (sample_count >= 1000) {
+        uint32_t max_hz = 1000000UL / min_period;
+        uint32_t min_hz = 1000000UL / max_period;
+
+        Serial.printf("[HID] Samples: %u | Deviations (>10%%): %u | Freq range: %u–%u Hz\n",
+                      sample_count, deviant_count, min_hz, max_hz);
+
+        deviant_count = 0;
+        min_period    = 1000;
+        max_period    = 1000;
+        sample_count  = 0;
+    }
+}
+
+// ============================================================================
 //  Core 0 Task — Sensor Pipeline + HID (1000 Hz)
 // ============================================================================
 // This task is pinned to Core 0 and runs at the highest practical priority.
@@ -81,6 +122,9 @@ void sensorTask(void* param) {
         // --- Run HID update (includes hold button debounce) ---
         unsigned long nowMs = millis();
         hidUpdate(localData.axisOutput, activeConfig, localData, nowMs);
+       
+        //Quick function for checking consistency.
+        //monitorHIDRate(micros());
 
         // --- Publish to shared state for Core 1 ---
         // Volatile write — field-by-field is fine, no mutex needed.
@@ -153,6 +197,7 @@ void setup() {
 
     // --- 2. Serial debug ---
     Serial.begin(115200);
+    delay(2200);
     // Brief wait for serial — non-blocking, won't hang if no terminal
     unsigned long serialWait = millis();
     while (!Serial && (millis() - serialWait) < 500) { }
@@ -215,9 +260,9 @@ void setup() {
     xTaskCreatePinnedToCore(
         sensorTask,     // Task function
         "sensor",       // Name (for debugging)
-        4096,           // Stack size (bytes) — sensor pipeline is lean
+        6144,           // Stack size (bytes) — sensor pipeline is lean
         NULL,           // Parameter (unused)
-        5,              // Priority (high — time-critical)
+        6,              // Priority (high — time-critical)
         NULL,           // Task handle (unused)
         0               // Core 0
     );

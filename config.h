@@ -182,7 +182,7 @@ enum DisplayState : uint8_t {
 // ============================================================================
 #define NAV_BOX_COUNT      4
 #define NAV_BOX_W         32
-#define NAV_BOX_H         18
+#define NAV_BOX_H         20
 #define NAV_SEPARATOR_PX   2
 
 static const int16_t NAV_BOX_X[NAV_BOX_COUNT] = { 0, 96, 64, 32 };

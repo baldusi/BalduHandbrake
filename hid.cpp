@@ -59,6 +59,7 @@ static int           lastHoldReading      = HIGH;
 static bool          holdButtonState      = false;  // debounced state (LOW=pressed)
 static bool          holdToggle           = false;  // toggled on each press
 
+
 // ============================================================================
 //  hidInit()
 // ============================================================================
