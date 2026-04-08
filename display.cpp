@@ -19,7 +19,7 @@
 static const char* const STRING_TABLE[NUM_LANGUAGES][NUM_STRINGS] = {
     // ---- LANG_EN ----
     {
-        "E-BRAKE", "v1.1", "A.Belluscio", "BalduHandbrake", "Initializing...",
+        "E-BRAKE", "v1.1.2", "A.Belluscio", "BalduHandbrake", "Initializing...",
         "HOLD", "LIVE", "PSI", "V", "%",
         "FAIL", "LOW", "OVER",
         "Game", "Firmware",
@@ -33,7 +33,7 @@ static const char* const STRING_TABLE[NUM_LANGUAGES][NUM_STRINGS] = {
     },
     // ---- LANG_ES ----
     {
-        "E-BRAKE", "v1.1", "A.Belluscio", "BalduHandbrake", "Iniciando...",
+        "E-BRAKE", "v1.1.2", "A.Belluscio", "BalduHandbrake", "Iniciando...",
         "SOSTEN", "VIVO", "PSI", "V", "%",
         "FALLO", "BAJA", "SOBRE",
         "Juego", "Firmware",
