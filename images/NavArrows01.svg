@@ -26,7 +26,7 @@
      showguides="true"
      inkscape:zoom="4.3036693"
      inkscape:cx="335.1791"
-     inkscape:cy="366.54768"
+     inkscape:cy="440.90283"
      inkscape:window-width="2560"
      inkscape:window-height="1494"
      inkscape:window-x="3829"
@@ -275,7 +275,7 @@
        height="20"
        x="89"
        y="65"
-       inkscape:export-filename="NavArrows01-02RN.png"
+       inkscape:export-filename="NavSN.png"
        inkscape:export-xdpi="25.399996"
        inkscape:export-ydpi="25.399996" />
     <text
@@ -283,7 +283,10 @@
        style="font-size:19.7556px;line-height:120%;font-family:'Ferro Rosso';-inkscape-font-specification:'Ferro Rosso';text-align:center;letter-spacing:0.529167px;writing-mode:lr-tb;direction:ltr;text-anchor:middle;fill:#0079ff;fill-opacity:1;stroke-width:0.1;paint-order:fill markers stroke"
        x="72.735413"
        y="82.335762"
-       id="text10"><tspan
+       id="text10"
+       inkscape:export-filename="NavXN.png"
+       inkscape:export-xdpi="25.399996"
+       inkscape:export-ydpi="25.399996"><tspan
          sodipodi:role="line"
          id="tspan10"
          style="font-style:normal;font-variant:normal;font-weight:bold;font-stretch:normal;font-size:19.7556px;font-family:Arial;-inkscape-font-specification:'Arial Bold';stroke-width:0.1"
@@ -307,7 +310,7 @@
        height="20"
        x="56.999992"
        y="85"
-       inkscape:export-filename="NavArrows01-02RN.png"
+       inkscape:export-filename="NavXS.png"
        inkscape:export-xdpi="25.399996"
        inkscape:export-ydpi="25.399996" />
     <rect
@@ -317,7 +320,7 @@
        height="20"
        x="89"
        y="85"
-       inkscape:export-filename="NavArrows01-02RN.png"
+       inkscape:export-filename="NavSS.png"
        inkscape:export-xdpi="25.399996"
        inkscape:export-ydpi="25.399996" />
     <text
@@ -348,7 +351,10 @@
        width="16"
        height="20"
        x="57"
-       y="105" />
+       y="105"
+       inkscape:export-filename="EditUp1N.png"
+       inkscape:export-xdpi="25.399996"
+       inkscape:export-ydpi="25.399996" />
     <path
        id="rect15"
        style="fill:#0079ff;stroke-width:0.117561;paint-order:fill markers stroke"
@@ -360,7 +366,10 @@
        width="16"
        height="20"
        x="73"
-       y="105" />
+       y="105"
+       inkscape:export-filename="EditUp2N.png"
+       inkscape:export-xdpi="25.399996"
+       inkscape:export-ydpi="25.399996" />
     <path
        id="rect15-7"
        style="fill:#0079ff;stroke-width:0.117561;paint-order:fill markers stroke"
@@ -388,7 +397,10 @@
        width="16"
        height="20"
        x="89"
-       y="105" />
+       y="105"
+       inkscape:export-filename="EditDown1N.png"
+       inkscape:export-xdpi="25.399996"
+       inkscape:export-ydpi="25.399996" />
     <path
        id="rect15-77"
        style="fill:#0079ff;stroke-width:0.117561;paint-order:fill markers stroke"
@@ -400,7 +412,10 @@
        width="16"
        height="20"
        x="105"
-       y="105" />
+       y="105"
+       inkscape:export-filename="EditDown2N.png"
+       inkscape:export-xdpi="25.399996"
+       inkscape:export-ydpi="25.399996" />
     <path
        id="rect15-0"
        style="fill:#0079ff;stroke-width:0.117561;paint-order:fill markers stroke"
@@ -428,7 +443,10 @@
        width="16"
        height="20"
        x="57"
-       y="125" />
+       y="125"
+       inkscape:export-filename="EditUp1S.png"
+       inkscape:export-xdpi="25.399996"
+       inkscape:export-ydpi="25.399996" />
     <path
        id="rect15-5"
        style="fill:#ffffff;stroke-width:0.117561;paint-order:fill markers stroke;fill-opacity:1"
@@ -445,7 +463,10 @@
        id="rect15-7-4"
        style="fill:#ffffff;stroke-width:0.117561;paint-order:fill markers stroke;fill-opacity:1"
        d="m 78.327241,134.60352 h -3.069299 l 5.78361,-7.0393 5.506958,7.0393 c -0.891439,0 -2.792646,0 -2.792646,0 v 8.85276 h -5.428623 z"
-       sodipodi:nodetypes="cccccccc" />
+       sodipodi:nodetypes="cccccccc"
+       inkscape:export-filename="EditUp2S.png"
+       inkscape:export-xdpi="25.399996"
+       inkscape:export-ydpi="25.399996" />
     <path
        sodipodi:type="star"
        style="fill:#ffffff;fill-opacity:1;stroke-width:0.1;paint-order:fill markers stroke"
@@ -468,7 +489,10 @@
        width="16"
        height="20"
        x="89"
-       y="125" />
+       y="125"
+       inkscape:export-filename="EditDown1S.png"
+       inkscape:export-xdpi="25.399996"
+       inkscape:export-ydpi="25.399996" />
     <path
        id="rect15-77-6"
        style="fill:#ffffff;stroke-width:0.117561;paint-order:fill markers stroke;fill-opacity:1"
@@ -501,6 +525,9 @@
        inkscape:rounded="0"
        inkscape:randomized="0"
        d="m 75.787193,110.75763 6.595025,3.80764 -6.595025,3.80764 z"
-       transform="matrix(0,1.1864391,-1.5201842,0,287.02202,42.58779)" />
+       transform="matrix(0,1.1864391,-1.5201842,0,287.02202,42.58779)"
+       inkscape:export-filename="EditDown2S.png"
+       inkscape:export-xdpi="25.399996"
+       inkscape:export-ydpi="25.399996" />
   </g>
 </svg>

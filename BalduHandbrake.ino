@@ -204,7 +204,9 @@ void setup() {
     Serial.println("\n===== BalduHandbrake Initializing =====");
 
     // --- 3. I2C + ADC ---
-    Wire.begin(I2C_SDA_PIN, I2C_SCL_PIN);
+    Wire.begin(I2C_SDA_PIN, I2C_SCL_PIN); // Setup the I2C bus pins
+    Wire.setClock(400000);                // Set the bus speed to 400khz
+    
     if (sensorInit()) {
         Serial.println("ADS1115: OK");
     } else {

@@ -30,19 +30,23 @@ static bool          forceFullRedraw        = true;
 
 static DeviceConfig  editConfig;
 
-static const uint8_t TOTAL_EDIT_SCREENS = 9;
-static const uint8_t EDIT_SCREEN_BUTTONS[] = { 2, 8, 2, 4, 2, 4, 2, 7, 2 };
+static const uint8_t TOTAL_EDIT_SCREENS = 10;
+static const uint8_t EDIT_SCREEN_BUTTONS[] = { 2, 8, 2, 4, 2, 4, 2, 2, 1, 7 };
 
 static unsigned long lastDisplayUpdate = 0;
 static unsigned long curveOverlayStartMs = 0;
 static bool          curveOverlayActive  = false;
 
-static uint8_t       selectedProfileSlot = 0;
-static bool          profileSlotExists[NUM_NVS_PROFILES];
-
 static CalibData     calibData;
 static unsigned long calibSampleInterval = 0;
 static unsigned long lastCalibSampleMs   = 0;
+
+static bool          quickSaveJustDone   = false;
+static unsigned long quickSaveDoneAtMs   = 0;
+static const unsigned long QUICK_SAVE_FLASH_MS = 1200;
+
+static uint8_t       selectedProfileSlot = 0;
+static bool          profileSlotExists[NUM_NVS_PROFILES];
 
 // ============================================================================
 //  uiInit()
@@ -150,10 +154,13 @@ static bool handleAdjustment(uint8_t si, uint8_t bi) {
             }
             break; }
         case 7:
-            if (bi>=4&&bi<4+NUM_NVS_PROFILES) { selectedProfileSlot=bi-4; return true; }
+            if (bi>=4&&bi<4+NUM_LANGUAGES) { editConfig.language=bi-4; return true; }
             break;
         case 8:
-            if (bi>=4&&bi<4+NUM_LANGUAGES) { editConfig.language=bi-4; return true; }
+            // Quick Save has no adjustable parameters; action handled in handleEncoderClick.
+            break;
+        case 9:
+            if (bi>=4&&bi<4+NUM_NVS_PROFILES) { selectedProfileSlot=bi-4; return true; }
             break;
     }
     return false;
@@ -293,8 +300,9 @@ static void handleEncoderClick(const DeviceConfig& ac, DeviceConfig& pc,
             } else if(uiState.menuScrollPos==3) {
                 uiState.state=DISPLAY_EDIT_VALUE; uiState.menuScrollPos=4;
                 backupEditParams(ac);
+                quickSaveJustDone = false; //Clear Quick Save's flash message.
                 if(uiState.editScreenIndex==6) calibReset();
-                else if(uiState.editScreenIndex==7) {
+                else if(uiState.editScreenIndex==9) {
                     selectedProfileSlot=0;
                     for(uint8_t i=0;i<NUM_NVS_PROFILES;i++) profileSlotExists[i]=storageProfileExists(i);
                 }
@@ -303,16 +311,16 @@ static void handleEncoderClick(const DeviceConfig& ac, DeviceConfig& pc,
             break;
         case DISPLAY_EDIT_VALUE:
             if(uiState.menuScrollPos==2) {
+                if(uiState.editScreenIndex==6) calibReset();
+                editConfig = ac; uiState.state=DISPLAY_MENU_LIST; uiState.menuScrollPos=3; forceFullRedraw=true;
+            } else if(uiState.menuScrollPos==3) {
                 if(uiState.editScreenIndex==6&&calibData.state==CALIB_DONE) {
                     editConfig.calAdcZero=calibData.resultAdcZero;
                     editConfig.calAdcMax=calibData.resultAdcMax;
                 }
                 commitEditParams(pc,cd);
                 uiState.state=DISPLAY_MENU_LIST; uiState.menuScrollPos=3; forceFullRedraw=true;
-            } else if(uiState.menuScrollPos==3) {
-                if(uiState.editScreenIndex==6) calibReset();
-                editConfig = ac; uiState.state=DISPLAY_MENU_LIST; uiState.menuScrollPos=3; forceFullRedraw=true;
-            } else {
+             } else {
                 uint8_t bi=uiState.menuScrollPos;
                 if(uiState.editScreenIndex==6) {
                     if(bi==4) {
@@ -335,9 +343,29 @@ static void handleEncoderClick(const DeviceConfig& ac, DeviceConfig& pc,
                             default: break;  // Ignored during settling/sampling/done
                         }
                     }
-                } else if(uiState.editScreenIndex==7) {
-                    if(bi==4+NUM_NVS_PROFILES) { storageSaveProfile(selectedProfileSlot,editConfig); profileSlotExists[selectedProfileSlot]=true; forceFullRedraw=true; }
-                    else if(bi==4+NUM_NVS_PROFILES+1) { if(storageLoadProfile(selectedProfileSlot,editConfig)) forceFullRedraw=true; }
+                } else if(uiState.editScreenIndex==8) {
+                    // Quick Save — single action button at bi=4
+                    if(bi==4) {
+                        // Capture the user's current LIVE view into the config before saving
+                        editConfig = ac;
+                        editConfig.liveScreen = uiState.liveScreen;
+                        uint8_t slot = storageGetLastProfile();
+                        storageSaveProfile(slot, editConfig);
+                        // Also push to active config so subsequent loads stay consistent
+                        commitEditParams(pc, cd);
+                        quickSaveJustDone = true;
+                        quickSaveDoneAtMs = nowMs;
+                        forceFullRedraw = true;
+                    }
+                } else if(uiState.editScreenIndex==9) {
+                    if(bi==4+NUM_NVS_PROFILES) {
+                        // Save: capture current liveScreen before persisting
+                        editConfig.liveScreen = uiState.liveScreen;
+                        storageSaveProfile(selectedProfileSlot,editConfig);
+                        profileSlotExists[selectedProfileSlot]=true;
+                        forceFullRedraw=true; }
+                    else if(bi==4+NUM_NVS_PROFILES+1) {
+                        if(storageLoadProfile(selectedProfileSlot,editConfig)) forceFullRedraw=true; }
                     else { handleAdjustment(uiState.editScreenIndex,bi); forceFullRedraw=true; }
                 } else {
                     if(handleAdjustment(uiState.editScreenIndex,bi)) forceFullRedraw=true;
@@ -411,10 +439,21 @@ static void updateDisplay(const LiveData& ld, const DeviceConfig& ac, unsigned l
                 break;
             case DISPLAY_EDIT_VALUE:
                 displayDrawNavBar(uiState);
-                if(uiState.editScreenIndex==6) displayDrawCalibrate(uiState,calibData,editConfig.language);
-                else if(uiState.editScreenIndex==7) displayDrawSaveLoad(uiState,selectedProfileSlot,profileSlotExists,editConfig.language);
-                else if(uiState.editScreenIndex==8) displayDrawLanguage(uiState,editConfig.language);
-                else displayDrawEditScreen(uiState,editConfig,ld);
+                if (uiState.editScreenIndex==6) {
+                    displayDrawCalibrate(uiState,calibData,editConfig.language);
+                } else if (uiState.editScreenIndex==7) {
+                    displayDrawLanguage(uiState,editConfig.language);
+                } else if(uiState.editScreenIndex==8) {
+                    // Auto-clear the "Saved!" flash after the timeout
+                    if(quickSaveJustDone && (nowMs - quickSaveDoneAtMs) >= QUICK_SAVE_FLASH_MS) {
+                        quickSaveJustDone = false;
+                    }
+                    displayDrawQuickSave(uiState, editConfig, storageGetLastProfile(), quickSaveJustDone);
+                } else if(uiState.editScreenIndex==9) {
+                    displayDrawSaveLoad(uiState,selectedProfileSlot,profileSlotExists,editConfig.language); 
+                } else {
+                    displayDrawEditScreen(uiState,editConfig,ld);
+                }
                 break;
         }
         return;
@@ -446,6 +485,11 @@ void uiUpdate(const LiveData& ld, const DeviceConfig& ac,
     prevUiState=uiState;
     if(uiState.state==DISPLAY_LIVE && uiState.liveScreen!=ac.liveScreen) {
         uiState.liveScreen=ac.liveScreen; forceFullRedraw=true;
+    }
+    // Quick Save flash timeout — trigger a redraw when it expires
+    if (quickSaveJustDone && (nowMs - quickSaveDoneAtMs) >= QUICK_SAVE_FLASH_MS) {
+        forceFullRedraw = true;
+        // Note: the flag itself is cleared in updateDisplay above.
     }
     encoder.tick();
     int16_t cp=encoder.getPosition(); int16_t delta=cp-lastEncoderPos;

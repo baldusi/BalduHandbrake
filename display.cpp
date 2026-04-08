@@ -28,8 +28,8 @@ static const char* const STRING_TABLE[NUM_LANGUAGES][NUM_STRINGS] = {
         "Sampling...", "Calibration OK", "Zero:", "Max:", "ERROR",
         "X=retry S=keep", "Purge fluid!", "Overpressure!", "Too close to zero",
         "Hold Mode", "Deadzones", "Default Curve", "Snap Threshold",
-        "Btn Debounce", "Refresh Rates", "Recalibrate", "Save & Load", "Language",
-        "Low:", "High:", "USB/ADC:", "Display:", "ms", "Hz", "Redo", "Next",
+        "Btn Debounce", "Refresh Rates", "Recalibrate", "Language", "Quick Save", "Save & Load",
+        "Save settings", "Saved!", "Low:", "High:", "USB/ADC:", "Display:", "ms", "Hz", "Redo", "Next",
     },
     // ---- LANG_ES ----
     {
@@ -42,7 +42,8 @@ static const char* const STRING_TABLE[NUM_LANGUAGES][NUM_STRINGS] = {
         "Muestreando...", "Calibracion OK", "Cero:", "Max:", "ERROR",
         "X=rein S=guard", "Purgar fluido!", "Sobrepresion!", "Muy cerca de cero",
         "Modo Espera", "Zonas Muertas", "Curva Default", "Umbral Snap",
-        "Antirrebote", "Tasas Refresco", "Recalibrar", "Guard & Cargar", "Idioma",
+        "Antirrebote", "Tasas Refresco", "Recalibrar", "Idioma", "Guardo Rapido", "Guardar & Cargar",
+        "Guardar ajustes", "Guardado!",
         "Bajo:", "Alto:", "USB/ADC:", "Pantalla:", "ms", "Hz", "Rehacer", "Seguir",
     },
 };
@@ -106,6 +107,9 @@ static bool     lastDispHold        = false;
 static bool     lastDispHoldInit    = false;
 static uint8_t  lastDispErrorState  = 0xFF;
 static uint8_t  lastDispCurveIndex  = 0xFF;
+
+//Used for the Up Down arrows helper functions
+struct IconPair { const AssetDesc* normal; const AssetDesc* selected; };
 
 // ============================================================================
 //  Layout constants
@@ -291,6 +295,58 @@ static void drawSelectableRow(int16_t x, int16_t y, int16_t w, int16_t h,
     }
 }
 
+
+
+// Standard 2x2 increment icon block: top row is up2/up1, bottom row is dn1/dn2.
+// Scroll positions are assigned in increment-magnitude order:
+//   baseScrollPos+0 = +big, +1 = +small, +2 = -small, +3 = -big
+// which matches handleAdjustment()'s bi 4/5/6/7 (and 8/9/10/11) ordering.
+static const IconPair EDIT_ICONS_4[] = {
+    { &icon_edit_up2_normal,   &icon_edit_up2_selected   },  // +big   (top-left)
+    { &icon_edit_up1_normal,   &icon_edit_up1_selected   },  // +small (top-right)
+    { &icon_edit_down1_normal, &icon_edit_down1_selected },  // -small (bottom-left)
+    { &icon_edit_down2_normal, &icon_edit_down2_selected },  // -big   (bottom-right)
+};
+
+// Single-increment 1x2 set (just +1/-1 stacked).
+static const IconPair EDIT_ICONS_2[] = {
+    { &icon_edit_up1_normal,   &icon_edit_up1_selected   },
+    { &icon_edit_down1_normal, &icon_edit_down1_selected },
+};
+
+// Draw a 2x2 block of edit icons. (x, y) is the top-left corner of the block.
+// Block size: 32w x 40h (no gaps) or 33w x 41h (gap=1).
+static void drawEditIconBlock2x2(int16_t x, int16_t y,
+                                 const IconPair icons[4],
+                                 uint8_t baseScrollPos, uint8_t currentScrollPos,
+                                 int16_t gap = 0) {
+    const int16_t ICON_W = 16, ICON_H = 20;
+    for (uint8_t i = 0; i < 4; i++) {
+        int16_t col = i & 1;        // 0 or 1
+        int16_t row = i >> 1;       // 0 or 1
+        int16_t ix = x + col * (ICON_W + gap);
+        int16_t iy = y + row * (ICON_H + gap);
+        bool sel = (currentScrollPos == baseScrollPos + i);
+        const AssetDesc* a = sel ? icons[i].selected : icons[i].normal;
+        lcd.pushImage(ix, iy, ICON_W, ICON_H, (const lgfx::rgb565_t*)a->data);
+    }
+}
+
+// Draw a vertical 1x2 column of edit icons (just up/down, single increment).
+// Block size: 16w x 40h.
+static void drawEditIconCol1x2(int16_t x, int16_t y,
+                               const IconPair icons[2],
+                               uint8_t baseScrollPos, uint8_t currentScrollPos,
+                               int16_t gap = 0) {
+    const int16_t ICON_W = 16, ICON_H = 20;
+    for (uint8_t i = 0; i < 2; i++) {
+        int16_t iy = y + i * (ICON_H + gap);
+        bool sel = (currentScrollPos == baseScrollPos + i);
+        const AssetDesc* a = sel ? icons[i].selected : icons[i].normal;
+        lcd.pushImage(x, iy, ICON_W, ICON_H, (const lgfx::rgb565_t*)a->data);
+    }
+}
+
 // ============================================================================
 //  displayInit()
 // ============================================================================
@@ -440,19 +496,6 @@ void displayUpdateLiveClean(const LiveData& data, const DeviceConfig& cfg) {
             lcd.setCursor(tx, 52);
             lcd.print((deciPercent) / 10u);
             lcd.print(str(STR_PERCENT));
-            //int16_t txtwidth;
-            //// "XX.X%" — estimate width: ~5 chars × 18px = 90px
-            //if (deciPercent<= 99) {
-            //    txtwidth = 4 * 22;
-            //} else if (deciPercent<= 999) {
-            //    txtwidth = 5 * 22;
-            //} else {
-            //    txtwidth = 6 * 22;
-            //}
-            //int16_t tx = (SCREEN_WIDTH - txtwidth) / 2;
-            //if (tx < 4) tx = 4;
-            //printDeciValue(tx, 52, deciPercent, LIVE_VALUE_COLOR, LIVE_BG_COLOR, &fonts::DejaVu24);
-            //lcd.print(str(STR_PERCENT));
         }
         lastDispDeciPercent = deciPercent;
         lastDispErrorState = errState;
@@ -670,32 +713,20 @@ static void drawNavBox(const UIState& ui, uint8_t index, bool isSelected) {
     int16_t x = NAV_BOX_X[index], y = NAV_BOX_Y[index];
     const AssetDesc* icon = NULL;
 
-    /*uint16_t bg = isSelected ? NAV_SELECTED_BG : NAV_NORMAL_BG;
-    lcd.fillRect(x, y, NAV_BOX_W, NAV_BOX_H, bg);
-    uint16_t fg = isSelected ? NAV_SELECTED_FG : NAV_NORMAL_FG;
-    int16_t cx = x + NAV_BOX_W / 2, cy = y + NAV_BOX_H / 2;
-    if (ui.state == DISPLAY_EDIT_VALUE && (index == 2 || index == 3)) {
-        lcd.setFont(&fonts::DejaVu18);
-        lcd.setTextColor(fg, bg);
-        lcd.setCursor(x + 10, y + 2);
-        lcd.print((index == 2) ? 'S' : 'X');
-    } else {
-        switch (index) {
-            case 0: lcd.fillTriangle(x+NAV_BOX_W-5,cy-6, x+NAV_BOX_W-5,cy+6, x+8,cy, fg); break;
-            case 1: lcd.fillTriangle(x+8,cy-6, x+8,cy+6, x+NAV_BOX_W-5,cy, fg); break;
-            case 2: lcd.fillTriangle(cx-7,y+NAV_BOX_H-5, cx+7,y+NAV_BOX_H-5, cx,y+5, fg); break;
-            case 3: lcd.fillTriangle(cx-7,y+5, cx+7,y+5, cx,y+NAV_BOX_H-5, fg); break;
-        }
-    }*/
-
     // Special case for edit mode S/X (keep the old text for now)
     if (ui.state == DISPLAY_EDIT_VALUE && (index == 2 || index == 3)) {
-        uint16_t bg = isSelected ? NAV_SELECTED_BG : NAV_NORMAL_BG;
-        lcd.fillRect(x, y, NAV_BOX_W, NAV_BOX_H, bg);
-        uint16_t fg = isSelected ? NAV_SELECTED_FG : NAV_NORMAL_FG;
-        lcd.setFont(&fonts::DejaVu18); lcd.setTextColor(fg, bg); lcd.setCursor(x + 10, y + 2);
-        lcd.print((index == 2) ? 'S' : 'X');
+        switch (index) {
+            case 2: icon = isSelected ? &icon_nav_x_selected  : &icon_nav_x_normal;  break;
+            case 3: icon = isSelected ? &icon_nav_s_selected  : &icon_nav_s_normal;  break;
+        }
+        lcd.pushImage(x, y, 32, 20, (const lgfx::rgb565_t*)icon->data);
         return;
+        //uint16_t bg = isSelected ? NAV_SELECTED_BG : NAV_NORMAL_BG;
+        //lcd.fillRect(x, y, NAV_BOX_W, NAV_BOX_H, bg);
+        //uint16_t fg = isSelected ? NAV_SELECTED_FG : NAV_NORMAL_FG;
+        //lcd.setFont(&fonts::DejaVu18); lcd.setTextColor(fg, bg); lcd.setCursor(x + 10, y + 2);
+        //lcd.print((index == 2) ? 'S' : 'X');
+        //return;
     }
 
     // Normal arrow icons
@@ -748,7 +779,7 @@ void displayDrawHoldMode(const UIState& ui, const DeviceConfig& cfg) {
     displayClearContentArea();
     displayDrawEditTitle(str(STR_TITLE_HOLD_MODE));
     bool isFW = (cfg.holdMode == HOLD_FIRMWARE);
-    int16_t baseY = CONTENT_Y + 20;
+    int16_t baseY = CONTENT_Y + 24;
 
     drawSelectableRow(4, baseY,      120, 22, str(STR_GAME),
                     ui.menuScrollPos == 4, !isFW);
@@ -760,24 +791,41 @@ void displayDrawDeadzones(const UIState& ui, const DeviceConfig& cfg) {
     activeLang = cfg.language;
     displayClearContentArea();
     displayDrawEditTitle(str(STR_TITLE_DEADZONES));
-    int16_t baseY = CONTENT_Y + 16, ax = 100;
-    lcd.setFont(&fonts::DejaVu9); lcd.setTextColor(EDIT_LABEL_COLOR, EDIT_BG_COLOR);
-    lcd.setCursor(8, baseY); lcd.print(str(STR_LABEL_LOW));
-    lcd.setFont(&fonts::DejaVu18); lcd.setTextColor(EDIT_VALUE_COLOR, EDIT_BG_COLOR); lcd.setCursor(8, baseY+12);
-    lcd.print(cfg.deadzoneLow/10u); lcd.print("."); lcd.print(cfg.deadzoneLow%10u); lcd.print(str(STR_PERCENT));
-    drawDoubleArrowUp(ax, baseY+2, (ui.menuScrollPos==4)?NAV_SELECTED_FG:NAV_NORMAL_FG);
-    drawSmallArrowUp(ax+18, baseY+2, (ui.menuScrollPos==5)?NAV_SELECTED_FG:NAV_NORMAL_FG);
-    drawSmallArrowDown(ax+18, baseY+18, (ui.menuScrollPos==6)?NAV_SELECTED_FG:NAV_NORMAL_FG);
-    drawDoubleArrowDown(ax, baseY+18, (ui.menuScrollPos==7)?NAV_SELECTED_FG:NAV_NORMAL_FG);
+
+    // 2x2 icon block: 32w x 40h. Place right-aligned with 2px margin.
+    const int16_t ICONS_X = SCREEN_WIDTH - 32 - 16;   // x = 94
+
+    // ---- LOW row ----
+    int16_t baseY = CONTENT_Y + 20;
+    lcd.setFont(&fonts::DejaVu9);
+    lcd.setTextColor(EDIT_LABEL_COLOR, EDIT_BG_COLOR);
+    lcd.setCursor(8, baseY);
+    lcd.print(str(STR_LABEL_LOW));
+
+    lcd.setFont(&fonts::DejaVu18);
+    lcd.setTextColor(EDIT_VALUE_COLOR, EDIT_BG_COLOR);
+    lcd.setCursor(8, baseY + 16);
+    lcd.print(cfg.deadzoneLow / 10u); lcd.print(".");
+    lcd.print(cfg.deadzoneLow % 10u); lcd.print(str(STR_PERCENT));
+
+    // Icons aligned with the value text vertically (block is 40px tall,
+    // text+label is ~30px, so center the block on the row visually)
+    drawEditIconBlock2x2(ICONS_X, baseY-4, EDIT_ICONS_4, 4, ui.menuScrollPos);
+
+    // ---- HIGH row ----
     int16_t hiY = baseY + 44;
-    lcd.setFont(&fonts::DejaVu9); lcd.setTextColor(EDIT_LABEL_COLOR, EDIT_BG_COLOR);
-    lcd.setCursor(8, hiY); lcd.print(str(STR_LABEL_HIGH));
-    lcd.setFont(&fonts::DejaVu18); lcd.setTextColor(EDIT_VALUE_COLOR, EDIT_BG_COLOR); lcd.setCursor(8, hiY+12);
-    lcd.print(cfg.deadzoneHigh/10u); lcd.print("."); lcd.print(cfg.deadzoneHigh%10u); lcd.print(str(STR_PERCENT));
-    drawDoubleArrowUp(ax, hiY+2, (ui.menuScrollPos==8)?NAV_SELECTED_FG:NAV_NORMAL_FG);
-    drawSmallArrowUp(ax+18, hiY+2, (ui.menuScrollPos==9)?NAV_SELECTED_FG:NAV_NORMAL_FG);
-    drawSmallArrowDown(ax+18, hiY+18, (ui.menuScrollPos==10)?NAV_SELECTED_FG:NAV_NORMAL_FG);
-    drawDoubleArrowDown(ax, hiY+18, (ui.menuScrollPos==11)?NAV_SELECTED_FG:NAV_NORMAL_FG);
+    lcd.setFont(&fonts::DejaVu9);
+    lcd.setTextColor(EDIT_LABEL_COLOR, EDIT_BG_COLOR);
+    lcd.setCursor(8, hiY);
+    lcd.print(str(STR_LABEL_HIGH));
+
+    lcd.setFont(&fonts::DejaVu18);
+    lcd.setTextColor(EDIT_VALUE_COLOR, EDIT_BG_COLOR);
+    lcd.setCursor(8, hiY + 16);
+    lcd.print(cfg.deadzoneHigh / 10u); lcd.print(".");
+    lcd.print(cfg.deadzoneHigh % 10u); lcd.print(str(STR_PERCENT));
+
+    drawEditIconBlock2x2(ICONS_X, hiY-4, EDIT_ICONS_4, 8, ui.menuScrollPos);
 }
 
 void displayDrawDefaultCurve(const UIState& ui, const DeviceConfig& cfg) {
@@ -787,8 +835,7 @@ void displayDrawDefaultCurve(const UIState& ui, const DeviceConfig& cfg) {
     int16_t baseY = CONTENT_Y + 30;
     lcd.setFont(&fonts::DejaVu18); lcd.setTextColor(EDIT_VALUE_COLOR, EDIT_BG_COLOR); lcd.setCursor(8, baseY+10);
     if (cfg.curveIndex < NUM_CURVES) lcd.print(CURVE_NAMES[cfg.curveIndex]);
-    drawSmallArrowUp(108, baseY, (ui.menuScrollPos==4)?NAV_SELECTED_FG:NAV_NORMAL_FG);
-    drawSmallArrowDown(108, baseY+22, (ui.menuScrollPos==5)?NAV_SELECTED_FG:NAV_NORMAL_FG);
+    drawEditIconCol1x2(SCREEN_WIDTH - 16 - 2, baseY, EDIT_ICONS_2, 4, ui.menuScrollPos);
 }
 
 void displayDrawSnapThreshold(const UIState& ui, const DeviceConfig& cfg) {
@@ -796,13 +843,10 @@ void displayDrawSnapThreshold(const UIState& ui, const DeviceConfig& cfg) {
     displayClearContentArea();
     displayDrawEditTitle(str(STR_TITLE_SNAP_THRESH));
     int16_t baseY = CONTENT_Y + 24;
-    lcd.setFont(&fonts::DejaVu18); lcd.setTextColor(EDIT_VALUE_COLOR, EDIT_BG_COLOR); lcd.setCursor(8, baseY+10);
+    lcd.setFont(&fonts::DejaVu24); lcd.setTextColor(EDIT_VALUE_COLOR, EDIT_BG_COLOR); lcd.setCursor(8, baseY+10);
     lcd.print(cfg.snapThreshold/10u); lcd.print("."); lcd.print(cfg.snapThreshold%10u); lcd.print(str(STR_PERCENT));
     int16_t ax = 100;
-    drawDoubleArrowUp(ax, baseY, (ui.menuScrollPos==4)?NAV_SELECTED_FG:NAV_NORMAL_FG);
-    drawSmallArrowUp(ax+18, baseY, (ui.menuScrollPos==5)?NAV_SELECTED_FG:NAV_NORMAL_FG);
-    drawSmallArrowDown(ax+18, baseY+22, (ui.menuScrollPos==6)?NAV_SELECTED_FG:NAV_NORMAL_FG);
-    drawDoubleArrowDown(ax, baseY+22, (ui.menuScrollPos==7)?NAV_SELECTED_FG:NAV_NORMAL_FG);
+    drawEditIconBlock2x2(SCREEN_WIDTH - 32 - 2, baseY, EDIT_ICONS_4, 4, ui.menuScrollPos);
 }
 
 void displayDrawButtonDebounce(const UIState& ui, const DeviceConfig& cfg) {
@@ -810,30 +854,27 @@ void displayDrawButtonDebounce(const UIState& ui, const DeviceConfig& cfg) {
     displayClearContentArea();
     displayDrawEditTitle(str(STR_TITLE_DEBOUNCE));
     int16_t baseY = CONTENT_Y + 24;
-    lcd.setFont(&fonts::DejaVu18); lcd.setTextColor(EDIT_VALUE_COLOR, EDIT_BG_COLOR); lcd.setCursor(8, baseY+10);
+    lcd.setFont(&fonts::DejaVu24); lcd.setTextColor(EDIT_VALUE_COLOR, EDIT_BG_COLOR); lcd.setCursor(8, baseY+10);
     lcd.print(cfg.debounceMs); lcd.print(" "); lcd.print(str(STR_LABEL_MS));
-    drawSmallArrowUp(108, baseY, (ui.menuScrollPos==4)?NAV_SELECTED_FG:NAV_NORMAL_FG);
-    drawSmallArrowDown(108, baseY+22, (ui.menuScrollPos==5)?NAV_SELECTED_FG:NAV_NORMAL_FG);
+    drawEditIconCol1x2(SCREEN_WIDTH - 16 - 8, baseY, EDIT_ICONS_2, 4, ui.menuScrollPos);
 }
 
 void displayDrawRefreshRates(const UIState& ui, const DeviceConfig& cfg) {
     activeLang = cfg.language;
     displayClearContentArea();
     displayDrawEditTitle(str(STR_TITLE_REFRESH));
-    int16_t baseY = CONTENT_Y + 16, ax = 100;
-    lcd.setFont(&fonts::DejaVu9); lcd.setTextColor(EDIT_LABEL_COLOR, EDIT_BG_COLOR);
+    int16_t baseY = CONTENT_Y + 20, ICONS_X = 96; //ax = 100
+    lcd.setFont(&fonts::DejaVu12); lcd.setTextColor(EDIT_LABEL_COLOR, EDIT_BG_COLOR);
     lcd.setCursor(8, baseY); lcd.print(str(STR_LABEL_USB_ADC));
-    lcd.setFont(&fonts::DejaVu12); lcd.setTextColor(EDIT_VALUE_COLOR, EDIT_BG_COLOR); lcd.setCursor(8, baseY+12);
+    lcd.setFont(&fonts::DejaVu18); lcd.setTextColor(EDIT_VALUE_COLOR, EDIT_BG_COLOR); lcd.setCursor(8, baseY+16);
     lcd.print(cfg.sampleRateHz); lcd.print(str(STR_LABEL_HZ));
-    drawSmallArrowUp(ax, baseY+2, (ui.menuScrollPos==4)?NAV_SELECTED_FG:NAV_NORMAL_FG);
-    drawSmallArrowDown(ax, baseY+18, (ui.menuScrollPos==5)?NAV_SELECTED_FG:NAV_NORMAL_FG);
+    drawEditIconCol1x2(ICONS_X, baseY -4, EDIT_ICONS_2, 4, ui.menuScrollPos);  // USB/ADC
     int16_t dY = baseY + 44;
-    lcd.setFont(&fonts::DejaVu9); lcd.setTextColor(EDIT_LABEL_COLOR, EDIT_BG_COLOR);
+    lcd.setFont(&fonts::DejaVu12); lcd.setTextColor(EDIT_LABEL_COLOR, EDIT_BG_COLOR);
     lcd.setCursor(8, dY); lcd.print(str(STR_LABEL_DISPLAY));
-    lcd.setFont(&fonts::DejaVu12); lcd.setTextColor(EDIT_VALUE_COLOR, EDIT_BG_COLOR); lcd.setCursor(8, dY+12);
+    lcd.setFont(&fonts::DejaVu18); lcd.setTextColor(EDIT_VALUE_COLOR, EDIT_BG_COLOR); lcd.setCursor(8, dY+16);
     lcd.print(cfg.displayRateHz); lcd.print(str(STR_LABEL_HZ));
-    drawSmallArrowUp(ax, dY+2, (ui.menuScrollPos==6)?NAV_SELECTED_FG:NAV_NORMAL_FG);
-    drawSmallArrowDown(ax, dY+18, (ui.menuScrollPos==7)?NAV_SELECTED_FG:NAV_NORMAL_FG);
+    drawEditIconCol1x2(ICONS_X, dY -4,    EDIT_ICONS_2, 6, ui.menuScrollPos);  // Display
 }
 
 void displayDrawCalibrate(const UIState& ui, const CalibData& calib, uint8_t language) {
@@ -914,6 +955,63 @@ void displayDrawCalibrate(const UIState& ui, const CalibData& calib, uint8_t lan
     }
 }
 
+void displayDrawLanguage(const UIState& ui, uint8_t currentLanguage) {
+    displayClearContentArea();
+    displayDrawEditTitle(str(STR_TITLE_LANGUAGE));
+    int16_t baseY = CONTENT_Y + 20;
+
+    for (uint8_t i = 0; i < NUM_LANGUAGES; i++) {
+    drawSelectableRow(4, baseY + i * 22, 120, 22, LANG_NAMES[i],
+                      ui.menuScrollPos == (4 + i),
+                      i == currentLanguage,
+                      &fonts::DejaVu18);
+    }
+}
+
+void displayDrawQuickSave(const UIState& ui, const DeviceConfig& cfg,
+                          uint8_t profileSlot, bool justSaved) {
+    activeLang = cfg.language;
+    displayClearContentArea();
+    displayDrawEditTitle(str(STR_TITLE_QUICK_SAVE));
+
+    int16_t baseY = CONTENT_Y + 14;
+
+    // Hint line
+    lcd.setFont(&fonts::DejaVu9);
+    lcd.setTextColor(EDIT_LABEL_COLOR, EDIT_BG_COLOR);
+    lcd.setCursor(8, baseY);
+    lcd.print(str(STR_QUICK_SAVE_HINT));
+
+    // Target profile line: "Prof 3"
+    lcd.setFont(&fonts::DejaVu18);
+    lcd.setTextColor(EDIT_VALUE_COLOR, EDIT_BG_COLOR);
+    lcd.setCursor(8, baseY + 16);
+    lcd.print(str(STR_PROFILE)); lcd.print(" "); lcd.print(profileSlot + 1);
+
+    // Big action button (only meaningful in EDIT_VALUE state)
+    if (ui.state == DISPLAY_EDIT_VALUE) {
+        bool isSel = (ui.menuScrollPos == 4);
+        int16_t btnY = baseY + 46;
+        drawButtonHighlight(4, btnY, 120, 26, isSel);
+
+        lcd.setFont(&fonts::DejaVu18);
+        uint16_t fg = isSel ? NAV_SELECTED_FG : EDIT_VALUE_COLOR;
+        uint16_t bg = isSel ? NAV_SELECTED_BG : EDIT_BG_COLOR;
+        lcd.setTextColor(fg, bg);
+        lcd.setCursor(28, btnY + 4);
+        lcd.print(str(STR_SAVE));
+    }
+
+    // Confirmation flash — drawn over/under the button area
+    if (justSaved) {
+        lcd.setFont(&fonts::DejaVu12);
+        lcd.setTextColor(LIVE_OK_COLOR, EDIT_BG_COLOR);
+        int16_t w = lcd.textWidth(str(STR_QUICK_SAVE_DONE));
+        lcd.setCursor((SCREEN_WIDTH - w) / 2, SCREEN_HEIGHT - 14);
+        lcd.print(str(STR_QUICK_SAVE_DONE));
+    }
+}
+
 void displayDrawSaveLoad(const UIState& ui, uint8_t selectedSlot,
                          const bool slotExists[NUM_NVS_PROFILES], uint8_t language) {
     activeLang = language;
@@ -932,15 +1030,6 @@ void displayDrawSaveLoad(const UIState& ui, uint8_t selectedSlot,
             ui.menuScrollPos == (4 + i)
         );
     }
-    //for (uint8_t i = 0; i < NUM_NVS_PROFILES; i++) {
-    //    int16_t slotY = baseY + i * 14;
-    //    bool isSel = (ui.menuScrollPos == (4+i));
-    //    drawButtonHighlight(4, slotY, 120, 16, isSel);
-    //    lcd.setFont(&fonts::DejaVu9); lcd.setTextColor(isSel ? NAV_SELECTED_FG : EDIT_LABEL_COLOR, EDIT_BG_COLOR);
-    //    lcd.setCursor(8, slotY+4); lcd.print(str(STR_PROFILE)); lcd.print(" "); lcd.print(i+1); lcd.print(": ");
-    //    if (slotExists[i]) { lcd.setTextColor(isSel?NAV_SELECTED_FG:LIVE_OK_COLOR, EDIT_BG_COLOR); lcd.print(str(STR_SAVED)); }
-    //    else { lcd.setTextColor(isSel?NAV_SELECTED_FG:NAV_NORMAL_FG, EDIT_BG_COLOR); lcd.print(str(STR_EMPTY)); }
-    //}
     int16_t actY = baseY + NUM_NVS_PROFILES*14 + 4;
     uint8_t sb = 4+NUM_NVS_PROFILES, lb = sb+1;
     drawButtonHighlight(4, actY, 56, 16, ui.menuScrollPos==sb);
@@ -949,29 +1038,6 @@ void displayDrawSaveLoad(const UIState& ui, uint8_t selectedSlot,
     drawButtonHighlight(66, actY, 56, 16, ui.menuScrollPos==lb);
     lcd.setTextColor((ui.menuScrollPos==lb)?NAV_SELECTED_FG:EDIT_LABEL_COLOR, (ui.menuScrollPos==lb)?NAV_SELECTED_BG:EDIT_BG_COLOR);
     lcd.setCursor(76, actY+4); lcd.print(str(STR_LOAD));
-}
-
-void displayDrawLanguage(const UIState& ui, uint8_t currentLanguage) {
-    displayClearContentArea();
-    displayDrawEditTitle(str(STR_TITLE_LANGUAGE));
-    int16_t baseY = CONTENT_Y + 20;
-
-    for (uint8_t i = 0; i < NUM_LANGUAGES; i++) {
-    drawSelectableRow(4, baseY + i * 22, 120, 20, LANG_NAMES[i],
-                      ui.menuScrollPos == (4 + i),
-                      i == currentLanguage,
-                      &fonts::DejaVu12);
-    }
-
-    //for (uint8_t i = 0; i < NUM_LANGUAGES; i++) {
-    //    int16_t slotY = baseY + i * 22;
-    //    bool isSel = (ui.menuScrollPos == (4+i));
-    //    bool isCur = (i == currentLanguage);
-    //    drawButtonHighlight(4, slotY, 120, 20, isSel);
-    //    lcd.setFont(&fonts::DejaVu12); lcd.setTextColor(isCur ? EDIT_VALUE_COLOR : NAV_NORMAL_FG, EDIT_BG_COLOR);
-    //    lcd.setCursor(8, slotY+2); lcd.print(LANG_NAMES[i]);
-    //    if (isCur) { lcd.setCursor(108, slotY+2); lcd.print("*"); }
-    //}
 }
 
 void displayDrawEditScreen(const UIState& ui, const DeviceConfig& cfg, const LiveData& data) {
@@ -985,10 +1051,10 @@ void displayDrawEditScreen(const UIState& ui, const DeviceConfig& cfg, const Liv
         case 5: displayDrawRefreshRates(ui, cfg); break;
         case 6: { CalibData ec; ec.state=CALIB_IDLE; ec.sampleCount=0; ec.settleStableCount=0; ec.errorMsg=NULL;
                    displayDrawCalibrate(ui, ec, cfg.language); break; }
-        //case 7: { bool es[NUM_NVS_PROFILES]={false}; displayDrawSaveLoad(ui, 0, es, cfg.language); break; }
-        case 7: { bool es[NUM_NVS_PROFILES]; for(uint8_t i=0;i<NUM_NVS_PROFILES;i++) es[i]=storageProfileExists(i);
+        case 7: displayDrawLanguage(ui, cfg.language); break;
+        case 8: displayDrawQuickSave(ui, cfg, storageGetLastProfile(), false); break;
+        case 9: { bool es[NUM_NVS_PROFILES]; for(uint8_t i=0;i<NUM_NVS_PROFILES;i++) es[i]=storageProfileExists(i);
            displayDrawSaveLoad(ui, 0, es, cfg.language); break; }
-        case 8: displayDrawLanguage(ui, cfg.language); break;
         default: break;
     }
 }
