@@ -1,3 +1,10 @@
+/*  BalduHandrake
+    Open Source Hydraulic Simracing Handbrake
+    Copyright (c) 2026 Alejandro Belluscio
+    Additional copyright holders listed inline below.
+    This file is licensed under the Apache 2.0 license
+    Full licence text: see LICENSE in this repository. 
+*/
 // ============================================================================
 // storage.h — NVS Profile Storage Interface
 // ============================================================================
@@ -24,9 +31,6 @@
 // This module has no dependencies on display, UI, or hardware — only
 // on config.h for the DeviceConfig struct and <Preferences.h> for NVS.
 // A future companion desktop app could reuse this module directly.
-//
-// Project:  BalduHandbrake — Open Source Hydraulic Simracing Handbrake
-// License:  Apache 2.0
 // ============================================================================
 #ifndef STORAGE_H
 #define STORAGE_H

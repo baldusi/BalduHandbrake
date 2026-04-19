@@ -109,6 +109,7 @@ void sensorTask(void* param) {
         if (configDirty) {
             activeConfig = pendingConfig;
             configDirty = false;
+            sensorUpdateDataRate(activeConfig.sampleRateHz);
             // Note: if curveIndex changed, the next sensorUpdate() will
             // use the new curve automatically (LUT is indexed per-call).
         }
@@ -204,13 +205,15 @@ void setup() {
     Serial.println("\n===== BalduHandbrake Initializing =====");
 
     // --- 3. I2C + ADC ---
-    Wire.begin(I2C_SDA_PIN, I2C_SCL_PIN); // Setup the I2C bus pins
-    Wire.setClock(400000);                // Set the bus speed to 400khz
+    Wire.begin(I2C_SDA_PIN, I2C_SCL_PIN);       // Setup the I2C bus pins
+    Wire.setClock(I2C_WIRE_SPEED);              // Set the bus speed to 400khz
     
     if (sensorInit()) {
-        Serial.println("ADS1115: OK");
+        Serial.print(ADS_SENSOR_NAME);
+        Serial.println(": OK");
     } else {
-        Serial.println("ADS1115: NOT FOUND");
+        Serial.print(ADS_SENSOR_NAME);
+        Serial.println(": NOT FOUND");
     }
 
     // --- 4. SPI + OLED ---
@@ -235,6 +238,7 @@ void setup() {
     }
     // Initialize pending to match active
     pendingConfig = activeConfig;
+    sensorUpdateDataRate(activeConfig.sampleRateHz);
 
     // --- Show boot screen (uses loaded language setting) ---
     displayBootScreen(activeConfig.language);

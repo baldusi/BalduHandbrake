@@ -1,12 +1,17 @@
+/*  BalduHandrake
+	Open Source Hydraulic Simracing Handbrake
+	Copyright (c) 2026 Alejandro Belluscio
+	Additional copyright holders listed inline below.
+	This file is licensed under the Apache 2.0 license
+	Full licence text: see LICENSE in this repository. 
+*/
 // ============================================================================
 // ui.cpp — User Interface Implementation
-// ============================================================================
-// Project:  BalduHandbrake — Open Source Hydraulic Simracing Handbrake
-// License:  Apache 2.0
 // ============================================================================
 
 #include "ui.h"
 #include "display.h"
+#include "sensor.h"
 #include "storage.h"
 #include <RotaryEncoder.h>
 
@@ -140,7 +145,8 @@ static bool handleAdjustment(uint8_t si, uint8_t bi) {
             if (bi==5) { editConfig.debounceMs=clampU8(editConfig.debounceMs-1,5,200); return true; }
             break;
         case 5: {
-            static const uint16_t sr[]={250,475,860,1000}; static const uint8_t nsr=4;
+            //static const uint16_t sr[]={250,475,860,1000}; static const uint8_t nsr=4;
+            const uint16_t* sr = SENSOR_RATE_OPTIONS; const uint8_t nsr = SENSOR_RATE_COUNT;
             static const uint16_t dr[]={10,15,20,30}; static const uint8_t ndr=4;
             if (bi==4||bi==5) {
                 uint8_t idx=0; for(uint8_t i=0;i<nsr;i++) if(sr[i]==editConfig.sampleRateHz){idx=i;break;}
@@ -205,7 +211,7 @@ static bool calibSettleFeed(uint16_t adcVal, bool isZero, const DeviceConfig& cf
     bool allStable=true;
     for(uint8_t i=0;i<CALIB_STABILITY_COUNT;i++) {
         uint16_t val=calibData.settleRingBuf[i];
-        if(val>avg+band||val<avg-band) { allStable=false; break; }
+        if((int32_t)val > (int32_t)avg + band || (int32_t)val < (int32_t)avg - band) { allStable=false; break; }
     }
     if(allStable) calibData.settleStableCount++; else calibData.settleStableCount=0;
     return (calibData.settleStableCount>=1);

@@ -1,22 +1,60 @@
+/*  BalduHandrake
+	Open Source Hydraulic Simracing Handbrake
+	Copyright (c) 2026 Alejandro Belluscio
+	Additional copyright holders listed inline below.
+	This file is licensed under the Apache 2.0 license
+	Full licence text: see LICENSE in this repository. 
+*/
 // ============================================================================
 // sensor.cpp — Sensor Pipeline Implementation
 // ============================================================================
 // This module runs entirely on Core 0. It owns the I2C bus (ADS1115) and
 // has no dependencies on SPI, OLED, or UI code.
-//
-// Project:  BalduHandbrake — Open Source Hydraulic Simracing Handbrake
-// License:  Apache 2.0
 // ============================================================================
 
 #include "sensor.h"
 #include "curves.h"
 #include <Wire.h>
-#include <ADS1X15.h>
 
+// ============================================================================
+//  ADC selection at 
+// ============================================================================
+#ifdef ADC_ADS1115
+    #include "devices/ads1115.h"
+#elif defined(ADC_ADS122C04)
+    #include "devices/ads122c04.h"
+#endif
+
+/*
+// ============================================================================
+//  ADC rate table — single source of truth for supported sample rates
+// ============================================================================
+#ifdef ADC_ADS1115
+  static const uint8_t ADC_REG_VALUES[] = { 5,   6,   7,   7    };
+  const uint16_t SENSOR_RATE_OPTIONS[]  = { 250, 475, 860, 1000 };
+#elif defined(ADC_ADS122C04)
+  static const uint8_t ADC_REG_VALUES[] = { 3,    4,    5,    6    };
+  const uint16_t SENSOR_RATE_OPTIONS[]  = { 175,  330,  600,  1000 };
+#endif
+*/
+
+const uint8_t  SENSOR_RATE_COUNT = sizeof(SENSOR_RATE_OPTIONS) / sizeof(SENSOR_RATE_OPTIONS[0]);
+
+static uint8_t findRateIndex(uint16_t hz) {
+    for (uint8_t i = 0; i < SENSOR_RATE_COUNT; i++)
+        if (SENSOR_RATE_OPTIONS[i] == hz) return i;
+    return SENSOR_RATE_COUNT - 1;
+}
+
+/*
 // ============================================================================
 //  Module-local ADC instance
 // ============================================================================
-static ADS1115 ads(ADS1115_ADDR);
+#ifdef ADC_ADS1115
+    static ADS1115 ads(ADS1115_ADDR);
+#elif defined(ADC_ADS122C04)
+    static SFE_ADS122C04 ads;
+#endif */
 
 // ============================================================================
 //  Transducer spec constants (derived from config.h hardware defines)
@@ -26,27 +64,63 @@ static ADS1115 ads(ADS1115_ADDR);
 // the transducer's absolute reading.
 static const uint16_t SPEC_ADC_SPAN = ADC_SPEC_FULL - ADC_SPEC_ZERO;
 
+
+// ============================================================================
+//  ensorUpdateDataRate()
+// ============================================================================
+void sensorUpdateDataRate(uint16_t sampleRateHz) {
+    uint8_t idx = findRateIndex(sampleRateHz);
+    //ads.setDataRate(ADC_REG_VALUES[idx]);
+    adcSetRate(ADC_REG_VALUES[idx]);
+}
+
 // ============================================================================
 //  sensorInit()
 // ============================================================================
 bool sensorInit() {
     // Wire.begin() must be called before this function (in main setup).
-    if (!ads.begin()) {
+    /*
+    #ifdef ADC_ADS1115
+        if (!ads.begin()) {
+    #elif defined(ADC_ADS122C04)
+        if (!ads.begin(ADS122C04_ADDR, Wire)) {
+    #endif
         return false;
     }
-
-    ads.setGain(0);      // ±6.144V range
-    ads.setDataRate(7);   // 860 SPS (max for ADS1115)
-    ads.setMode(0);       // Continuous conversion
-    ads.requestADC(0);    // Start continuous on channel 0
-
+    #ifdef ADC_ADS1115
+        ads.setGain(0);      // ±6.144V range
+        ads.setDataRate(ADC_REG_VALUES[SENSOR_RATE_COUNT - 1]); // 860 SPS (max for ADS1115)
+        //ads.setDataRate(7);   // 860 SPS (max for ADS1115)
+        ads.setMode(0);       // Continuous conversion
+        ads.requestADC(0);    // Start continuous on channel 0
+    #elif defined(ADC_ADS122C04)
+        ads.setInputMultiplexer(ADS122C04_MUX_AIN0_AVSS);               // Single-ended on A0 vs AVSS
+        ads.setGain(ADS122C04_GAIN_1);                                  // Do not change as the transducer is 5V and needs the full range
+        ads.setDataCounter(ADS122C04_DCNT_DISABLE);                     // Disable the data counter (Note: the library does not currently support the data count)
+        ads.setDataIntegrityCheck(ADS122C04_CRC_DISABLED);              // Disable CRC checking (Note: the library does not currently support data integrity checking)
+        ads.setConversionMode(ADS122C04_CONVERSION_MODE_CONTINUOUS);    // Use continuous mode
+        ads.setOperatingMode(ADS122C04_OP_MODE_NORMAL);                 // Disable turbo mode
+        ads.setVoltageReference(ADS122C04_VREF_AVDD);                   // ADS122C04 must be fed fromt he same 5V rail as the transducer
+        ads.enableInternalTempSensor(ADS122C04_TEMP_SENSOR_OFF);        // When using temp sensor on, you read the internal temp data, not the ADC
+        ads.setDataRate(ADC_REG_VALUES[SENSOR_RATE_COUNT - 1]);         // 1000 SPS (max non turbo mode)
+    #endif
+    */
+    if (!adcBegin()) return false;
+    adcConfigure();
+    adcSetRate(ADC_REG_VALUES[SENSOR_RATE_COUNT - 1]);
     // Wait for ADC power-on and first conversion to stabilize.
     // The ADS1115 needs time after configuration before reliable reads.
     // This only runs once at boot, so a generous delay costs nothing.
     delay(300);
 
     // Flush first conversion (may be stale or transitional)
-    int16_t firstRead = ads.getValue();
+    /* #ifdef ADC_ADS1115
+        int16_t firstRead = ads.getValue();
+    #elif defined(ADC_ADS122C04)
+        int32_t raw24 = ads.getConversionData();
+        int16_t firstRead = (int16_t)(raw24 >> 8);
+    #endif  */
+    int16_t firstRead = adcRead();
     (void)firstRead;  // intentionally discarded
 
     return true;
@@ -161,7 +235,8 @@ void sensorUpdate(const DeviceConfig& cfg, LiveData& out) {
     // ------------------------------------------------------------------
     // 1. Read ADC (cached value from continuous mode — no I2C wait)
     // ------------------------------------------------------------------
-    int16_t adcRaw = ads.getValue();
+    //int16_t adcRaw = ads.getValue();
+    int16_t adcRaw = adcRead();
 
     // ------------------------------------------------------------------
     // 1a. Median-of-3 pre-filter (kills single-sample spikes)

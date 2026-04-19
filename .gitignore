@@ -2,3 +2,4 @@ build/
 *.bin
 *.elf
 .vscode/
+hardware/working/

@@ -1,3 +1,11 @@
+Wavesahre ESP32-S3 Zero
+ADS1115 Generic
+SSD1351 Generic
+Generic Logic Converter 5V to 3.3V
+Ejoyus 500psi transducer
+EC11 Rotary Encoder
+Momentary Button
+
 ESP32-S3 -> SSD1351
 OUT 	 -> VCC
 GND 	 -> GND
@@ -7,7 +15,7 @@ GPIO 10	 -> CS
 GPIO 6	 -> DC
 GPIO 7	 -> RST
 
-Cap between SSD1351 VCC and GND
+100nF and  10µF capacitors between SSD1351 VCC and GND
 
 
 ESP32-S3 -> Logic Converter -> ADS1115
@@ -19,19 +27,21 @@ GPIO 8	 -> LV3
 GND 	 --------------------> GND
 	    LH4		    -> SCL
 	    LH3		    -> SDA
-Cap between ADS1115 VCC and GND
+100nF and  10µF capacitors between ADS1115 VCC and GND
+SMAJ3.3A TVS diode from ADS1115 A0 to GND
 
 
 Transducer -> ESP32-S3
 VCC	   -> 5V
 GND	   -> GND
 OUT	   -> Resistor 220R -> ADS1115 (A0)
-
-Cap between OUT and GND
+100nF and  10µF capacitors between VCC and GND
+1µF capacitor between OUT and GND
 
 ESP32-S3 -> Momentary Button
 GND 	 -> GND
 GPIO 4	 -> Momentary Button
+100nF capacitors between Button and GND
 
 ESP32-S3 -> Rotary Encoder EC11
 OUT 	 -> VCC
@@ -39,4 +49,4 @@ GND 	 -> GND
 GPIO 3	 -> Button
 GPIO 5	 -> CLK
 GPIO 13	 -> DT
-
+10nF from encoder A to GND, 10nF from encoder B to GND, at the ESP32 side

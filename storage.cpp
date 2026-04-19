@@ -1,3 +1,10 @@
+/*  BalduHandrake
+	Open Source Hydraulic Simracing Handbrake
+	Copyright (c) 2026 Alejandro Belluscio
+	Additional copyright holders listed inline below.
+	This file is licensed under the Apache 2.0 license
+	Full licence text: see LICENSE in this repository. 
+*/
 // ============================================================================
 // storage.cpp — NVS Profile Storage Implementation
 // ============================================================================
@@ -14,9 +21,6 @@
 // The field descriptor table CONFIG_FIELDS[] defines the mapping between
 // DeviceConfig struct fields and NVS keys. Adding a new field to
 // DeviceConfig requires adding exactly one line to this table.
-//
-// Project:  BalduHandbrake — Open Source Hydraulic Simracing Handbrake
-// License:  Apache 2.0
 // ============================================================================
 
 #include "storage.h"

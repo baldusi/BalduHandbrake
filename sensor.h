@@ -1,3 +1,10 @@
+/*  BalduHandrake
+    Open Source Hydraulic Simracing Handbrake
+    Copyright (c) 2026 Alejandro Belluscio
+    Additional copyright holders listed inline below.
+    This file is licensed under the Apache 2.0 license
+    Full licence text: see LICENSE in this repository. 
+*/
 // ============================================================================
 // sensor.h — Sensor Pipeline Interface
 // ============================================================================
@@ -8,14 +15,18 @@
 //   sensorInit()   — call once during setup, after Wire.begin()
 //   sensorUpdate() — call every sample cycle; reads ADC, runs pipeline,
 //                     writes results to the shared LiveData struct
-//
-// Project:  BalduHandbrake — Open Source Hydraulic Simracing Handbrake
-// License:  Apache 2.0
 // ============================================================================
 #ifndef SENSOR_H
 #define SENSOR_H
 
 #include "config.h"
+
+#ifdef ADC_ADS1115
+    #define ADS_SENSOR_NAME "ADS1115"
+#elif defined(ADC_ADS122C04)
+    #define ADS_SENSOR_NAME "ADS122C04"
+#endif
+
 
 // ----------------------------------------------------------------------------
 //  Public API
@@ -42,5 +53,11 @@ void sensorUpdate(const DeviceConfig& cfg, LiveData& out);
 // Exposed separately so it can be unit-tested or reused.
 uint16_t applyCurveCorrection(uint16_t normValue, uint8_t curveIndex,
                               uint16_t snapThreshold);
+
+// --- ADC rate abstraction ---
+extern const uint16_t SENSOR_RATE_OPTIONS[];
+extern const uint8_t  SENSOR_RATE_COUNT;
+
+void sensorUpdateDataRate(uint16_t sampleRateHz);
 
 #endif // SENSOR_H

@@ -1,11 +1,15 @@
+/*  BalduHandrake
+	Open Source Hydraulic Simracing Handbrake
+	Copyright (c) 2026 Alejandro Belluscio
+	Additional copyright holders listed inline below.
+	This file is licensed under the Apache 2.0 license
+	Full licence text: see LICENSE in this repository. 
+*/
 // ============================================================================
 // display.h — OLED Display Interface
 // ============================================================================
 // LIMITATION: 7-bit ASCII only. See notes in display.cpp.
-//
-// Project:  BalduHandbrake — Open Source Hydraulic Simracing Handbrake
-// License:  Apache 2.0
-// ============================================================================
+
 #ifndef DISPLAY_H
 #define DISPLAY_H
 

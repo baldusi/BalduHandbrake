@@ -1,13 +1,16 @@
+/*  BalduHandrake
+	Open Source Hydraulic Simracing Handbrake
+	Copyright (c) 2026 Alejandro Belluscio
+	Additional copyright holders listed inline below.
+	This file is licensed under the Apache 2.0 license
+	Full licence text: see LICENSE in this repository. 
+*/
 // ============================================================================
 // display.cpp — OLED Display Implementation
-// ============================================================================
-// Project:  BalduHandbrake — Open Source Hydraulic Simracing Handbrake
-// License:  Apache 2.0
 // ============================================================================
 
 #include "display.h"
 #include "storage.h"
-
 #include "assets.h"
 
 #define LGFX_USE_V1
@@ -19,7 +22,7 @@
 static const char* const STRING_TABLE[NUM_LANGUAGES][NUM_STRINGS] = {
     // ---- LANG_EN ----
     {
-        "E-BRAKE", "v1.1.2", "A.Belluscio", "BalduHandbrake", "Initializing...",
+        "E-BRAKE", "v1.2", "A.Belluscio", "BalduHandbrake", "Initializing...",
         "HOLD", "LIVE", "PSI", "V", "%",
         "FAIL", "LOW", "OVER",
         "Game", "Firmware",
@@ -33,7 +36,7 @@ static const char* const STRING_TABLE[NUM_LANGUAGES][NUM_STRINGS] = {
     },
     // ---- LANG_ES ----
     {
-        "E-BRAKE", "v1.1.2", "A.Belluscio", "BalduHandbrake", "Iniciando...",
+        "E-BRAKE", "v1.2", "A.Belluscio", "BalduHandbrake", "Iniciando...",
         "SOSTEN", "VIVO", "PSI", "V", "%",
         "FALLO", "BAJA", "SOBRE",
         "Juego", "Firmware",
@@ -691,12 +694,12 @@ void displayUpdateLiveDark(const LiveData& data, uint8_t language) {
 // ============================================================================
 //  Hold Mode Indicator (public — for setup-time use)
 // ============================================================================
-void displayUpdateHoldIndicator(bool holdActive, uint8_t language) {
-    activeLang = language;
-    drawHoldIndicator(36, 90, holdActive);
-    lastDispHold = holdActive;
-    lastDispHoldInit = true;
-}
+//void displayUpdateHoldIndicator(bool holdActive, uint8_t language) {
+//    activeLang = language;
+//    drawHoldIndicator(36, 90, holdActive);
+//    lastDispHold = holdActive;
+//    lastDispHoldInit = true;
+//}
 
 // ============================================================================
 //  Navigation Bar
@@ -845,7 +848,7 @@ void displayDrawSnapThreshold(const UIState& ui, const DeviceConfig& cfg) {
     int16_t baseY = CONTENT_Y + 24;
     lcd.setFont(&fonts::DejaVu24); lcd.setTextColor(EDIT_VALUE_COLOR, EDIT_BG_COLOR); lcd.setCursor(8, baseY+10);
     lcd.print(cfg.snapThreshold/10u); lcd.print("."); lcd.print(cfg.snapThreshold%10u); lcd.print(str(STR_PERCENT));
-    int16_t ax = 100;
+    //int16_t ax = 100;
     drawEditIconBlock2x2(SCREEN_WIDTH - 32 - 2, baseY, EDIT_ICONS_4, 4, ui.menuScrollPos);
 }
 
@@ -946,12 +949,12 @@ void displayDrawCalibrate(const UIState& ui, const CalibData& calib, uint8_t lan
         // Redo button
         drawButtonHighlight(4, btnY, 56, 16, ui.menuScrollPos == 4);
         lcd.setFont(&fonts::DejaVu12);
-        lcd.setTextColor((ui.menuScrollPos == 4) ? NAV_SELECTED_FG : EDIT_LABEL_COLOR, EDIT_BG_COLOR);
-        lcd.setCursor(12, btnY + 4); lcd.print(str(STR_CAL_REDO));
+        lcd.setTextColor((ui.menuScrollPos == 4) ? NAV_SELECTED_FG : EDIT_LABEL_COLOR, (ui.menuScrollPos == 4) ? NAV_SELECTED_BG : EDIT_BG_COLOR);
+        lcd.setCursor(12, btnY + 2); lcd.print(str(STR_CAL_REDO));
         // Next button
         drawButtonHighlight(66, btnY, 56, 16, ui.menuScrollPos == 5);
-        lcd.setTextColor((ui.menuScrollPos == 5) ? NAV_SELECTED_FG : EDIT_LABEL_COLOR, EDIT_BG_COLOR);
-        lcd.setCursor(76, btnY + 4); lcd.print(str(STR_CAL_NEXT));
+        lcd.setTextColor((ui.menuScrollPos == 5) ? NAV_SELECTED_FG : EDIT_LABEL_COLOR, (ui.menuScrollPos == 5) ? NAV_SELECTED_BG : EDIT_BG_COLOR);
+        lcd.setCursor(76, btnY + 2); lcd.print(str(STR_CAL_NEXT));
     }
 }
 

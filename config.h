@@ -1,13 +1,17 @@
+/*  BalduHandrake
+	Open Source Hydraulic Simracing Handbrake
+	Copyright (c) 2026 Alejandro Belluscio
+	Additional copyright holders listed inline below.
+	This file is licensed under the Apache 2.0 license
+	Full licence text: see LICENSE in this repository. 
+*/
 // ============================================================================
 // config.h — BalduHandbrake System Configuration
 // ============================================================================
 // This file contains ALL hardware definitions, default parameters, and shared
 // data types for the BalduHandbrake project. If you are building your own
 // handbrake, this is the primary file you need to edit to match your hardware.
-//
-// Project:  BalduHandbrake — Open Source Hydraulic Simracing Handbrake
-// License:  Apache 2.0
-// Hardware: Waveshare ESP32-S3 Zero + ADS1115 + SSD1351 + EC11 Encoder
+// Hardware: Waveshare ESP32-S3 Zero + [ADS1115 || ADS122C04] + SSD1351 + EC11 Encoder
 // ============================================================================
 #ifndef CONFIG_H
 #define CONFIG_H
@@ -22,8 +26,16 @@
 #define USB_MANUFACTURER_STR "Baldu Handbrake Project"
 
 // ============================================================================
+//  ADC HARDWARE SELECTION — uncomment exactly one
+// ============================================================================
+#define ADC_ADS1115
+//#define ADC_ADS122C04  //Preliminary work to support the ADS122C04
+
+// ============================================================================
 //  PIN ASSIGNMENTS — Waveshare ESP32-S3 Zero
 // ============================================================================
+
+//Hardware Version 1.0
 #define HOLD_BUTTON_PIN       4
 #define ROTARY_CHANNEL_A_PIN  5
 #define ROTARY_CHANNEL_B_PIN  13
@@ -35,7 +47,41 @@
 #define OLED_MOSI             11
 #define I2C_SDA_PIN           8
 #define I2C_SCL_PIN           9
-#define ADS1115_ADDR          0x48
+
+
+/*
+//Hardware Version 1.1
+//This version of the connection was made in such a way that no signal
+//trace crosses. If you have separate VCC and GND planes, you can use a
+//single layer for signals. And in a 2 layer PCB, you minimize your need
+//for vias and using the bottom plane to cross the VCC.
+
+#ifdef ADC_ADS122C04
+    #define ADS_DRDY              1
+#endif
+
+#define I2C_SCL_PIN           2
+#define I2C_SDA_PIN           3
+#define ROTARY_CHANNEL_A_PIN  4
+#define ROTARY_CHANNEL_B_PIN  5
+#define ROTARY_BUTTON_PIN     6
+#define OLED_MOSI             13
+#define OLED_SCK              12
+//#define OLED_MISO             11
+#define OLED_CS               10
+#define OLED_DC               9
+#define OLED_RST              8
+#define HOLD_BUTTON_PIN       7
+*/
+
+//Address parameters defined here to keep all hardware configuration here.
+#ifdef ADC_ADS1115
+    #define ADS1115_ADDR          0x48
+#elif defined(ADC_ADS122C04)
+    #define ADS122C04_ADDR        0x40
+#endif
+
+#define I2C_WIRE_SPEED        400000
 
 // ============================================================================
 //  DISPLAY

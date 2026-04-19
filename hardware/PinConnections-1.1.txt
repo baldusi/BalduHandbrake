@@ -1,0 +1,55 @@
+Wavesahre ESP32-S3 Zero
+ADS1115 Generic Adafruit OG Board
+SSD1351 Generic Waveshare Board
+Generic Logic Converter 5V to 3.3V
+Ejoyus 500psi transducer
+KY-040 Rotary Encoder
+Momentary Button
+
+ESP32-S3 -> SSD1351
+OUT 	 -> VCC
+GND 	 -> GND
+GPIO 13	 -> DIN/MOSI
+GPIO 12	 -> CLK
+GPIO 11  -> (Reserved) DOUT/MISO 
+GPIO 10	 -> CS
+GPIO  9	 -> DC
+GPIO  8	 -> RST
+
+NO 100nF and  10µF capacitors between SSD1351 VCC and GND as the board includes them.
+
+
+ESP32-S3 -> Logic Converter -> ADS1115
+OUT 	 -> VCC
+GND 	 -> GND
+GPIO 1   -> (Reserved) LV4
+GPIO 2 	 -> LV3
+GPIO 3	 -> LV2
+5V 	 --------------------> VCC
+GND 	 --------------------> GND
+	    LH2		    -> SCL
+	    LH3		    -> SDA
+            LH4             -> (Reserved) DRDY
+
+NO 100nF and  10µF capacitors between ADS1115 VCC and GND as the board includes them.
+Replacing with a Adafruit ADS122C04 
+
+Transducer -> ESP32-S3
+VCC	   -> 5V
+GND	   -> GND
+OUT	   -> Resistor 220R -> ADS1115 (A0)
+100nF and  10µF capacitors between VCC and GND
+1µF capacitor between OUT and GND
+
+ESP32-S3 -> Momentary Button
+GND 	 -> GND
+GPIO 4	 -> Momentary Button
+100nF capacitors between Button and GND
+
+ESP32-S3 -> KY-040 Rotary Encoder
+OUT 	 -> VCC
+GND 	 -> GND
+GPIO 4	 -> CLK
+GPIO 5	 -> DT
+GPIO 6	 -> SW
+10nF from encoder CLK to GND, 10nF from encoder DT to GND, 100uF from encoder SW to GND.

@@ -1,3 +1,10 @@
+/*  BalduHandrake
+    Open Source Hydraulic Simracing Handbrake
+    Copyright (c) 2026 Alejandro Belluscio
+    Additional copyright holders listed inline below.
+    This file is licensed under the Apache 2.0 license
+    Full licence text: see LICENSE in this repository. 
+*/
 // ============================================================================
 // hid.h — USB HID Interface
 // ============================================================================
@@ -15,8 +22,6 @@
 //                  (TinyUSB requires early initialization)
 //   hidUpdate() — call every sample cycle on Core 0
 //
-// Project:  BalduHandbrake — Open Source Hydraulic Simracing Handbrake
-// License:  Apache 2.0
 // ============================================================================
 #ifndef HID_H
 #define HID_H

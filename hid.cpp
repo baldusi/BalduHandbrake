@@ -1,12 +1,16 @@
+/*  BalduHandrake
+	Open Source Hydraulic Simracing Handbrake
+	Copyright (c) 2026 Alejandro Belluscio
+	Additional copyright holders listed inline below.
+	This file is licensed under the Apache 2.0 license
+	Full licence text: see LICENSE in this repository. 
+*/
 // ============================================================================
 // hid.cpp — USB HID Implementation
 // ============================================================================
 // This module runs entirely on Core 0. It owns the USB HID interface and
 // the hold button GPIO. No other module should call TinyUSB functions or
 // read the hold button pin.
-//
-// Project:  BalduHandbrake — Open Source Hydraulic Simracing Handbrake
-// License:  Apache 2.0
 // ============================================================================
 
 #include "hid.h"
