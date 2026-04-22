@@ -132,7 +132,7 @@ void sensorTask(void* param) {
         LiveData* dest = (LiveData*)&liveData;
         dest->rawAdc         = localData.rawAdc;
         dest->centiVolts     = localData.centiVolts;
-        dest->centiPsi       = localData.centiPsi;
+        dest->centiUnit      = localData.centiUnit;
         dest->centiPercent   = localData.centiPercent;
         dest->axisOutput     = localData.axisOutput;
         dest->holdActive     = localData.holdActive;
@@ -153,6 +153,7 @@ void sensorTask(void* param) {
 // this doesn't affect sensor timing because it's on a separate core.
 
 void uiTask(void* param) {
+    
     for (;;) {
         unsigned long nowMs = millis();
 
@@ -161,7 +162,7 @@ void uiTask(void* param) {
         const volatile LiveData* src = &liveData;
         localData.rawAdc         = src->rawAdc;
         localData.centiVolts     = src->centiVolts;
-        localData.centiPsi       = src->centiPsi;
+        localData.centiUnit      = src->centiUnit;
         localData.centiPercent   = src->centiPercent;
         localData.axisOutput     = src->axisOutput;
         localData.holdActive     = src->holdActive;
@@ -203,11 +204,17 @@ void setup() {
     unsigned long serialWait = millis();
     while (!Serial && (millis() - serialWait) < 500) { }
     Serial.println("\n===== BalduHandbrake Initializing =====");
+    Serial.print("Sensor Mode: ");
+    #ifdef SENSOR_PRESSURE_TRANSDUCER
+        Serial.println("pressure transducer");
+    #elif defined(SENSOR_LOAD_CELL)
+        Serial.println("load cell");
+    #endif
 
     // --- 3. I2C + ADC ---
     Wire.begin(I2C_SDA_PIN, I2C_SCL_PIN);       // Setup the I2C bus pins
     Wire.setClock(I2C_WIRE_SPEED);              // Set the bus speed to 400khz
-    
+
     if (sensorInit()) {
         Serial.print(ADS_SENSOR_NAME);
         Serial.println(": OK");

@@ -17,20 +17,21 @@
 // All sensor device drivers must define:
 //  Preprocessor:
 //		a) #include <DEVICE LIBRARY>
-//		b) #define ADS_SENSOR_NAME "User readable device name"
 //	Variables
 //		1) ads 						//Handle of the sensor
 // 		1) ADC_REG_VALUES			//Code parameters for the allowed sample rates
 // 		2) SENSOR_RATE_OPTIONS		//SPS in numbers
-//	Helper functions:
-// 		a) adcBegin()				//Initialization code
-// 		b) adcConfigure()			//Configuration code
-// 		c) adcRead()				//Value read, must be normalized to int16_t
-// 		d) adcSetRate()				//Sample rate setting of the sensor
+//  Helper functions:
+//      a) adcBegin()               // Initialization code
+//      b) adcConfigure()           // Configuration code
+//      c) adcDataReady()           // Duplicate read avoidance
+//      d) adcRead()                // Value read, must be normalized to int16_t
+//      e) adcSetRate()             // Sample rate setting of the sensor
+//      f) adcRawToCentiVolts()     // Raw to true input voltage (gain-compensated)
+//      g) adcRawToCentiUnit()      // Raw to physical unit (spec-based)
+//      h) adcCheckFault()          // Sensor-specific fault detection
 
 #include <SparkFun_ADS122C04_ADC_Arduino_Library.h>
-
-#define ADS_SENSOR_NAME "ADS122C04"
 
 static SFE_ADS122C04 ads;
 
@@ -53,9 +54,40 @@ static void adcConfigure() {
     ads.enableInternalTempSensor(ADS122C04_TEMP_SENSOR_OFF);        // When using temp sensor on, you read the internal temp data, not the ADC
 }
 
+static bool adcDataReady() {
+    #if ADC_DRDY_PIN >= 0
+        return digitalRead(ADC_DRDY_PIN) == LOW;   // GPIO read: nanoseconds
+    #else
+        return ads.checkDataReady();                // I2C register poll: ~100µs
+    #endif
+}
+
 static int16_t adcRead() {
     int32_t raw24 = ads.readADC();
     return (int16_t)(raw24 >> 8);
 }
 
 static void adcSetRate(uint8_t reg) { ads.setDataRate(reg); }
+
+// Gain 1, AVDD reference (5V), 24-bit >> 8 = 16-bit
+// LSB ≈ 5.0V / 65536 ≈ 76.3µV
+// centivolts = raw * 500 / 65536 (with rounding)
+static uint16_t adcRawToCentiVolts(int16_t raw) {
+    if (raw <= 0) return 0;
+    return (uint16_t)(((uint32_t)raw * 500UL + 32768UL) / 65536UL);
+}
+
+static const uint16_t SPEC_ADC_SPAN = ADC_SPEC_FULL - ADC_SPEC_ZERO;
+
+static uint32_t adcRawToCentiUnit(int16_t raw) {
+    if (raw <= (int16_t)ADC_SPEC_ZERO) return 0;
+    uint32_t offset = (uint32_t)(raw - ADC_SPEC_ZERO);
+    return (offset * (uint32_t)(SENSOR_UNIT_MAX * 100UL) + (SPEC_ADC_SPAN / 2))
+           / SPEC_ADC_SPAN;
+}
+
+static uint8_t adcCheckFault(int16_t raw) {
+    if (raw < (int16_t)ADC_FAIL_THRESHOLD)   return FAULT_DISCONNECTED;
+    if (raw >= (int16_t)ADC_OVER_THRESHOLD)  return FAULT_SATURATION;
+    return FAULT_NONE;
+}

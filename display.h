@@ -14,29 +14,7 @@
 #define DISPLAY_H
 
 #include "config.h"
-
-// ============================================================================
-//  String IDs
-// ============================================================================
-enum StringID : uint8_t {
-    STR_BOOT_TITLE = 0, STR_BOOT_VERSION, STR_BOOT_AUTHOR,
-    STR_BOOT_PROJECT, STR_BOOT_STATUS,
-    STR_HOLD, STR_LIVE, STR_PSI, STR_VOLTS, STR_PERCENT,
-    STR_FAIL, STR_LOW, STR_OVER,
-    STR_GAME, STR_FIRMWARE,
-    STR_SAVE, STR_LOAD, STR_EMPTY, STR_SAVED, STR_PROFILE,
-    STR_CAL_PUSH_DOWN, STR_CAL_PULL_UP, STR_CAL_SETTLING, STR_CAL_HOLD_STEADY,
-    STR_CAL_SAMPLING, STR_CAL_DONE, STR_CAL_ZERO_OK, STR_CAL_MAX_OK,
-    STR_CAL_ERROR, STR_CAL_RETRY, STR_CAL_PURGE, STR_CAL_OVERPRESS, STR_CAL_TOO_LOW,
-    STR_TITLE_HOLD_MODE, STR_TITLE_DEADZONES, STR_TITLE_DEFAULT_CURVE,
-    STR_TITLE_SNAP_THRESH, STR_TITLE_DEBOUNCE, STR_TITLE_REFRESH,
-    STR_TITLE_CALIBRATE, STR_TITLE_LANGUAGE, STR_TITLE_QUICK_SAVE, STR_TITLE_SAVE_LOAD,
-    STR_QUICK_SAVE_HINT /*Save Current Settins*/, STR_QUICK_SAVE_DONE /*Current Settings Saved!*/,
-    STR_LABEL_LOW, STR_LABEL_HIGH, STR_LABEL_USB_ADC, STR_LABEL_DISPLAY,
-    STR_LABEL_MS, STR_LABEL_HZ,
-    STR_CAL_REDO, STR_CAL_NEXT,
-    NUM_STRINGS
-};
+#include "strtable.h"
 
 // ============================================================================
 //  UI State
@@ -53,11 +31,6 @@ struct UIState {
 // ============================================================================
 void displayInit();
 void displayBootScreen(uint8_t language);
-
-// ============================================================================
-//  Localization
-// ============================================================================
-const char* displayGetString(StringID id, uint8_t language);
 
 // ============================================================================
 //  Live Screens
@@ -100,7 +73,6 @@ void displayDrawQuickSave(const UIState& ui, const DeviceConfig& cfg,
                           uint8_t profileSlot, bool justSaved);
 void displayDrawSaveLoad(const UIState& ui, uint8_t selectedSlot,
                          const bool slotExists[NUM_NVS_PROFILES], uint8_t language);
-
 
 // ============================================================================
 //  Utility

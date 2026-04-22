@@ -16,22 +16,23 @@
 // All sensor device drivers must define:
 //  Preprocessor:
 //		a) #include <DEVICE LIBRARY>
-//		b) #define ADS_SENSOR_NAME "User readable device name"
 //	Variables
 //		1) ads 						//Handle of the sensor
 // 		1) ADC_REG_VALUES			//Code parameters for the allowed sample rates
 // 		2) SENSOR_RATE_OPTIONS		//SPS in numbers
-//	Helper functions:
-// 		a) adcBegin()				//Initialization code
-// 		b) adcConfigure()			//Configuration code
-// 		c) adcRead()				//Value read, must be normalized to int16_t
-// 		d) adcSetRate()				//Sample rate setting of the sensor
+//  Helper functions:
+//      a) adcBegin()               // Initialization code
+//      b) adcConfigure()           // Configuration code
+//      c) adcDataReady()           // Duplicate read avoidance
+//      d) adcRead()                // Value read, must be normalized to int16_t
+//      e) adcSetRate()             // Sample rate setting of the sensor
+//      f) adcRawToCentiVolts()     // Raw to true input voltage (gain-compensated)
+//      g) adcRawToCentiUnit()      // Raw to physical unit (spec-based)
+//      h) adcCheckFault()          // Sensor-specific fault detection
 
 
 //Rob Tillaart ADS1X15 library
 #include <ADS1X15.h>
-
-#define ADS_SENSOR_NAME "ADS1115"
 
 static ADS1115 ads(ADS1115_ADDR);
 
@@ -49,6 +50,30 @@ static void adcConfigure() {
     ads.requestADC(0);
 }
 
+static bool adcDataReady() { return true; }  // No DRDY, accept duplicates
+
 static int16_t adcRead() { return ads.getValue(); }
 
 static void adcSetRate(uint8_t reg) { ads.setDataRate(reg); }
+
+// ADS1115 at gain 0 (±6.144V): LSB = 0.1875 mV
+// centivolts = raw * 1875 / 100000 (with rounding)
+static uint16_t adcRawToCentiVolts(int16_t raw) {
+    if (raw <= 0) return 0;
+    return (uint16_t)(((uint32_t)raw * 1875UL + 50000UL) / 100000UL);
+}
+
+static const uint16_t SPEC_ADC_SPAN = ADC_SPEC_FULL - ADC_SPEC_ZERO;
+
+static uint32_t adcRawToCentiUnit(int16_t raw) {
+    if (raw <= (int16_t)ADC_SPEC_ZERO) return 0;
+    uint32_t offset = (uint32_t)(raw - ADC_SPEC_ZERO);
+    return (offset * (uint32_t)(SENSOR_UNIT_MAX * 100UL) + (SPEC_ADC_SPAN / 2))
+           / SPEC_ADC_SPAN;
+}
+
+static uint8_t adcCheckFault(int16_t raw) {
+    if (raw < (int16_t)ADC_FAIL_THRESHOLD)   return FAULT_DISCONNECTED;
+    if (raw >= (int16_t)ADC_OVER_THRESHOLD)  return FAULT_SATURATION;
+    return FAULT_NONE;
+}

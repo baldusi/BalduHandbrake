@@ -25,8 +25,9 @@
     #define ADS_SENSOR_NAME "ADS1115"
 #elif defined(ADC_ADS122C04)
     #define ADS_SENSOR_NAME "ADS122C04"
+#elif defined(ADC_NAU7802)
+    #define ADS_SENSOR_NAME "NAU7802"
 #endif
-
 
 // ----------------------------------------------------------------------------
 //  Public API

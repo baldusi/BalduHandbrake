@@ -19,24 +19,24 @@
 // ============================================================================
 //  ADC selection at 
 // ============================================================================
-#ifdef ADC_ADS1115
+#if defined(ADC_ADS1115)
     #include "devices/ads1115.h"
+#elif defined(ADC_ADS122C04) && defined(SENSOR_LOAD_CELL)
+    #include "devices/ads122c04_loadcell.h"
 #elif defined(ADC_ADS122C04)
     #include "devices/ads122c04.h"
+#elif defined(ADC_NAU7802)
+    #include "devices/nau7802.h"
 #endif
 
-/*
-// ============================================================================
-//  ADC rate table — single source of truth for supported sample rates
-// ============================================================================
-#ifdef ADC_ADS1115
-  static const uint8_t ADC_REG_VALUES[] = { 5,   6,   7,   7    };
-  const uint16_t SENSOR_RATE_OPTIONS[]  = { 250, 475, 860, 1000 };
-#elif defined(ADC_ADS122C04)
-  static const uint8_t ADC_REG_VALUES[] = { 3,    4,    5,    6    };
-  const uint16_t SENSOR_RATE_OPTIONS[]  = { 175,  330,  600,  1000 };
+// Safety check: NAU7802 is load-cell only
+#if defined(ADC_NAU7802) && !defined(SENSOR_LOAD_CELL)
+    #error "NAU7802 requires SENSOR_LOAD_CELL — it is a load cell amplifier, not a general-purpose ADC"
 #endif
-*/
+
+// ============================================================================
+//  ADC rate table — common code to al shim drivers
+// ============================================================================
 
 const uint8_t  SENSOR_RATE_COUNT = sizeof(SENSOR_RATE_OPTIONS) / sizeof(SENSOR_RATE_OPTIONS[0]);
 
@@ -46,15 +46,7 @@ static uint8_t findRateIndex(uint16_t hz) {
     return SENSOR_RATE_COUNT - 1;
 }
 
-/*
-// ============================================================================
-//  Module-local ADC instance
-// ============================================================================
-#ifdef ADC_ADS1115
-    static ADS1115 ads(ADS1115_ADDR);
-#elif defined(ADC_ADS122C04)
-    static SFE_ADS122C04 ads;
-#endif */
+
 
 // ============================================================================
 //  Transducer spec constants (derived from config.h hardware defines)
@@ -62,7 +54,7 @@ static uint8_t findRateIndex(uint16_t hz) {
 // These define the transducer's physical voltage-to-pressure relationship.
 // They are NOT affected by user calibration — PSI display always reflects
 // the transducer's absolute reading.
-static const uint16_t SPEC_ADC_SPAN = ADC_SPEC_FULL - ADC_SPEC_ZERO;
+// static const uint16_t SPEC_ADC_SPAN = ADC_SPEC_FULL - ADC_SPEC_ZERO;
 
 
 // ============================================================================
@@ -70,7 +62,6 @@ static const uint16_t SPEC_ADC_SPAN = ADC_SPEC_FULL - ADC_SPEC_ZERO;
 // ============================================================================
 void sensorUpdateDataRate(uint16_t sampleRateHz) {
     uint8_t idx = findRateIndex(sampleRateHz);
-    //ads.setDataRate(ADC_REG_VALUES[idx]);
     adcSetRate(ADC_REG_VALUES[idx]);
 }
 
@@ -79,32 +70,7 @@ void sensorUpdateDataRate(uint16_t sampleRateHz) {
 // ============================================================================
 bool sensorInit() {
     // Wire.begin() must be called before this function (in main setup).
-    /*
-    #ifdef ADC_ADS1115
-        if (!ads.begin()) {
-    #elif defined(ADC_ADS122C04)
-        if (!ads.begin(ADS122C04_ADDR, Wire)) {
-    #endif
-        return false;
-    }
-    #ifdef ADC_ADS1115
-        ads.setGain(0);      // ±6.144V range
-        ads.setDataRate(ADC_REG_VALUES[SENSOR_RATE_COUNT - 1]); // 860 SPS (max for ADS1115)
-        //ads.setDataRate(7);   // 860 SPS (max for ADS1115)
-        ads.setMode(0);       // Continuous conversion
-        ads.requestADC(0);    // Start continuous on channel 0
-    #elif defined(ADC_ADS122C04)
-        ads.setInputMultiplexer(ADS122C04_MUX_AIN0_AVSS);               // Single-ended on A0 vs AVSS
-        ads.setGain(ADS122C04_GAIN_1);                                  // Do not change as the transducer is 5V and needs the full range
-        ads.setDataCounter(ADS122C04_DCNT_DISABLE);                     // Disable the data counter (Note: the library does not currently support the data count)
-        ads.setDataIntegrityCheck(ADS122C04_CRC_DISABLED);              // Disable CRC checking (Note: the library does not currently support data integrity checking)
-        ads.setConversionMode(ADS122C04_CONVERSION_MODE_CONTINUOUS);    // Use continuous mode
-        ads.setOperatingMode(ADS122C04_OP_MODE_NORMAL);                 // Disable turbo mode
-        ads.setVoltageReference(ADS122C04_VREF_AVDD);                   // ADS122C04 must be fed fromt he same 5V rail as the transducer
-        ads.enableInternalTempSensor(ADS122C04_TEMP_SENSOR_OFF);        // When using temp sensor on, you read the internal temp data, not the ADC
-        ads.setDataRate(ADC_REG_VALUES[SENSOR_RATE_COUNT - 1]);         // 1000 SPS (max non turbo mode)
-    #endif
-    */
+ 
     if (!adcBegin()) return false;
     adcConfigure();
     adcSetRate(ADC_REG_VALUES[SENSOR_RATE_COUNT - 1]);
@@ -114,12 +80,6 @@ bool sensorInit() {
     delay(300);
 
     // Flush first conversion (may be stale or transitional)
-    /* #ifdef ADC_ADS1115
-        int16_t firstRead = ads.getValue();
-    #elif defined(ADC_ADS122C04)
-        int32_t raw24 = ads.getConversionData();
-        int16_t firstRead = (int16_t)(raw24 >> 8);
-    #endif  */
     int16_t firstRead = adcRead();
     (void)firstRead;  // intentionally discarded
 
@@ -129,26 +89,6 @@ bool sensorInit() {
 // ============================================================================
 //  Pipeline internals
 // ============================================================================
-
-// Convert raw ADC count to centivolts (V × 100, e.g. 457 = 4.57V).
-// ADS1115 at gain=0: LSB = 0.1875 mV = 1875 / 10000000 V
-// centivolts = raw * 1875 / 1000000, scaled with rounding:
-static uint16_t rawToCentiVolts(int16_t raw) {
-    if (raw <= 0) return 0;
-    return (uint16_t)(((uint32_t)raw * 1875UL + 50000UL) / 100000UL);
-}
-
-// Convert raw ADC count to centiPsi (PSI × 100, e.g. 12345 = 123.45 PSI).
-// Uses the transducer's physical spec: ADC_SPEC_ZERO = 0 PSI, ADC_SPEC_FULL = 500 PSI.
-// This is purely informational — NOT affected by user calibration.
-static uint32_t rawToCentiPsi(int16_t raw) {
-    if (raw <= (int16_t)ADC_SPEC_ZERO) return 0;
-
-    uint32_t offset = (uint32_t)(raw - ADC_SPEC_ZERO);
-    // centiPsi = offset * (PSI_MAX * 100) / SPEC_ADC_SPAN, with rounding
-    return (offset * (uint32_t)(TRANSDUCER_PSI_MAX * 100UL) + (SPEC_ADC_SPAN / 2))
-           / SPEC_ADC_SPAN;
-}
 
 // Compute derived deadzone boundaries from config.
 // Returns the effective ADC range after deadzones are applied.
@@ -236,6 +176,12 @@ void sensorUpdate(const DeviceConfig& cfg, LiveData& out) {
     // 1. Read ADC (cached value from continuous mode — no I2C wait)
     // ------------------------------------------------------------------
     //int16_t adcRaw = ads.getValue();
+    static LiveData lastOut = {};
+    
+    if (!adcDataReady()) {
+        out = lastOut;      // Reuse previous result
+        return;
+    }
     int16_t adcRaw = adcRead();
 
     // ------------------------------------------------------------------
@@ -270,51 +216,44 @@ void sensorUpdate(const DeviceConfig& cfg, LiveData& out) {
     // 1c. Continue pipeline with filtered value
     // ------------------------------------------------------------------
     out.rawAdc = (adcRaw > 0) ? (uint16_t)adcRaw : 0;
-    out.centiVolts = rawToCentiVolts(adcRaw);
+    //out.centiVolts = rawToCentiVolts(adcRaw);
+    out.centiVolts = adcRawToCentiVolts(adcRaw);
 
     // ------------------------------------------------------------------
-    // 2. Validate reading — check hardware safety limits
+    // 2. Fault detection (driver-specific)
     // ------------------------------------------------------------------
+    uint8_t fault = adcCheckFault(adcRaw);
+    out.transducerFail = (fault & FAULT_DISCONNECTED) != 0;
+    out.saturationFail = (fault & FAULT_SATURATION) != 0;
 
-    // Transducer disconnected or dead (< 0.25V)
-    if (adcRaw < (int16_t)ADC_FAIL_THRESHOLD) {
-        out.transducerFail = true;
+    if (fault & FAULT_DISCONNECTED) {
         out.pressureLow    = false;
-        out.saturationFail = false;
-        out.centiPsi       = 0;
-        out.centiPercent    = 0;
+        out.centiUnit      = 0;
+        out.centiPercent   = 0;
         out.axisOutput     = Z_AXIS_MIN;
         return;
     }
 
-    // Overpressure / voltage saturation (> 4.82V)
-    if (adcRaw >= (int16_t)ADC_OVER_THRESHOLD) {
-        out.transducerFail = false;
+    if (fault & FAULT_SATURATION) {
         out.pressureLow    = false;
-        out.saturationFail = true;
-        out.centiPsi       = (uint32_t)TRANSDUCER_PSI_MAX * 108UL;  // Show ~540 PSI
-        out.centiPercent    = 10000;   // 100.00%
+        out.centiUnit      = (uint32_t)SENSOR_UNIT_MAX * 108UL;
+        out.centiPercent   = 10000;
         out.axisOutput     = Z_AXIS_MAX;
         return;
     }
 
-    // Clear error flags for normal readings
     out.transducerFail = false;
     out.saturationFail = false;
 
     // ------------------------------------------------------------------
-    // 3. Compute informational PSI (always from transducer spec)
+    // 3. Compute informational unit value (from sensor spec, not calibration)
     // ------------------------------------------------------------------
-    out.centiPsi = rawToCentiPsi(adcRaw);
+    out.centiUnit = adcRawToCentiUnit(adcRaw);
 
     // ------------------------------------------------------------------
-    // 4. Check for low pressure warning
+    // 4. Check for low pressure/force warning
     // ------------------------------------------------------------------
-    if (adcRaw < (int16_t)cfg.calAdcZero) {
-        out.pressureLow = true;
-    } else {
-        out.pressureLow = false;
-    }
+    out.pressureLow = (adcRaw < (int16_t)cfg.calAdcZero);
 
     // ------------------------------------------------------------------
     // 5. Apply deadzones and normalize to Z-axis range
@@ -346,4 +285,5 @@ void sensorUpdate(const DeviceConfig& cfg, LiveData& out) {
     // ------------------------------------------------------------------
     out.axisOutput  = axisCurved;
     out.centiPercent = (uint16_t)((uint32_t)axisCurved * 10000UL / Z_AXIS_MAX);
+    lastOut = out;
 }

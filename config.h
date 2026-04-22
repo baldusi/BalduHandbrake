@@ -28,8 +28,15 @@
 // ============================================================================
 //  ADC HARDWARE SELECTION — uncomment exactly one
 // ============================================================================
+// ADC
 #define ADC_ADS1115
 //#define ADC_ADS122C04  //Preliminary work to support the ADS122C04
+//#define ADC_ADS122C04  //Preliminary work to support the ADS122C04
+//#define ADC_NAU7802    //Preliminary support of NAU7802 for load cells
+
+// Sensor type
+#define SENSOR_PRESSURE_TRANSDUCER
+//#define SENSOR_LOAD_CELL
 
 // ============================================================================
 //  PIN ASSIGNMENTS — Waveshare ESP32-S3 Zero
@@ -45,9 +52,10 @@
 #define OLED_RST              7
 #define OLED_SCK              12
 #define OLED_MOSI             11
+#define OLED_MISO             -1
 #define I2C_SDA_PIN           8
 #define I2C_SCL_PIN           9
-
+#define ADS_DRDY_PIN          -1 //For ADS122C04 or other ADS with a Data Ready line. -1 means not connected
 
 /*
 //Hardware Version 1.1
@@ -57,7 +65,9 @@
 //for vias and using the bottom plane to cross the VCC.
 
 #ifdef ADC_ADS122C04
-    #define ADS_DRDY              1
+    #define ADS_DRDY_PIN            1
+#else
+    #define ADS_DRDY_PIN            -1
 #endif
 
 #define I2C_SCL_PIN           2
@@ -79,6 +89,8 @@
     #define ADS1115_ADDR          0x48
 #elif defined(ADC_ADS122C04)
     #define ADS122C04_ADDR        0x40
+#elif defined(ADC_NAU7802)
+    // NAU7802 has fixed hardware address 0x2A — no configuration needed
 #endif
 
 #define I2C_WIRE_SPEED        400000
@@ -96,18 +108,42 @@
 #define Z_AXIS_MAX            4095
 
 // ============================================================================
-//  ADC / TRANSDUCER HARDWARE CONSTANTS
+//  SENSOR PHYSICAL CONSTANTS
 // ============================================================================
-// Ejoyous 0-500 psi transducer: 0.5V = 0 psi, 4.5V = 500 psi (ratiometric).
-// ADS1115 at gain=0 (±6.144V): LSB = 0.1875 mV
-#define TRANSDUCER_PSI_MIN        0
-#define TRANSDUCER_PSI_MAX      500
-#define TRANSDUCER_MV_PER_PSI     8
+// Configure these to match your hardware. Only one block is active at a time.
 
-#define ADC_FAIL_THRESHOLD     1333     // Below 0.25V: transducer disconnected
-#define ADC_SPEC_ZERO          2667     // 0.50V: transducer theoretical zero
-#define ADC_SPEC_FULL         24000     // 4.50V: transducer theoretical full scale
-#define ADC_OVER_THRESHOLD    25707     // 4.82V: near VCC, unreliable above
+#ifdef SENSOR_LOAD_CELL
+    // Load cell spec — set from your cell's datasheet
+    // Example: 200 kgf cell, 2 mV/V sensitivity, 5V excitation
+    // Full-scale output = 2 * 5 = 10 mV
+    // At gain 128, ref 2.048V, 16-bit: 10mV → ~40960 counts
+    #define SENSOR_UNIT_MAX             200     // kgf full scale
+    #define ADC_SPEC_ZERO                 0     // bridge at rest (0 mV)
+    #define ADC_SPEC_FULL             40960     // bridge at rated load
+    #define ADC_FAIL_HIGH_THRESHOLD   32000     // positive rail: open circuit
+    #define ADC_FAIL_LOW_THRESHOLD   -32000     // negative rail: open circuit
+#else
+    // Pressure transducer spec — Ejoyous 0–500 PSI
+    // 0.5V = 0 PSI, 4.5V = 500 PSI (ratiometric, 5V supply)
+    // ADS1115 at gain=0 (±6.144V): LSB = 0.1875 mV
+    #define SENSOR_UNIT_MAX             500     // PSI full scale
+    #define ADC_SPEC_ZERO              2667     // 0.50V: transducer zero
+    #define ADC_SPEC_FULL             24000     // 4.50V: transducer full scale
+    #define ADC_FAIL_THRESHOLD         1333     // below 0.25V: disconnected
+    #define ADC_OVER_THRESHOLD        25707     // near VCC: saturation
+#endif
+
+// ============================================================================
+//  CALIBRATION VALIDATION THRESHOLDS (used by ui.cpp)
+// ============================================================================
+// Unified names so calibration code doesn't need #ifdefs
+#ifdef SENSOR_LOAD_CELL
+    #define CALIB_REJECT_ZERO_LOW     ADC_FAIL_LOW_THRESHOLD
+    #define CALIB_REJECT_MAX_HIGH     ADC_FAIL_HIGH_THRESHOLD
+#else
+    #define CALIB_REJECT_ZERO_LOW     ADC_FAIL_THRESHOLD
+    #define CALIB_REJECT_MAX_HIGH     ADC_OVER_THRESHOLD
+#endif
 
 // ============================================================================
 //  CURVE DEFINITIONS
@@ -147,6 +183,16 @@ inline uint8_t curveToLutIndex(uint8_t curveId) {
 enum HoldMode : uint8_t {
     HOLD_GAME     = 0,
     HOLD_FIRMWARE = 1
+};
+
+// ============================================================================
+//  SENSOR FAULT FLAGS
+// ============================================================================
+enum SensorFault : uint8_t {
+    FAULT_NONE         = 0x00,
+    FAULT_DISCONNECTED = 0x01,
+    FAULT_LOW          = 0x02,
+    FAULT_SATURATION   = 0x04,
 };
 
 // ============================================================================
@@ -282,7 +328,7 @@ inline DeviceConfig getDefaultConfig() {
 struct LiveData {
     uint16_t rawAdc;
     uint16_t centiVolts;
-    uint32_t centiPsi;
+    uint32_t centiUnit;
     uint16_t centiPercent;
     uint16_t axisOutput;
     bool     holdActive;

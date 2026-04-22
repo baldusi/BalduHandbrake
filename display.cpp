@@ -12,46 +12,9 @@
 #include "display.h"
 #include "storage.h"
 #include "assets.h"
-
+#include "strtable.h"
 #define LGFX_USE_V1
 #include <LovyanGFX.hpp>
-
-// ============================================================================
-//  Localization String Table
-// ============================================================================
-static const char* const STRING_TABLE[NUM_LANGUAGES][NUM_STRINGS] = {
-    // ---- LANG_EN ----
-    {
-        "E-BRAKE", "v1.2", "A.Belluscio", "BalduHandbrake", "Initializing...",
-        "HOLD", "LIVE", "PSI", "V", "%",
-        "FAIL", "LOW", "OVER",
-        "Game", "Firmware",
-        "Save", "Load", "Empty", "Saved", "Prof",
-        "Push handle down", "Pull handle up", "Settling...", "Hold steady...",
-        "Sampling...", "Calibration OK", "Zero:", "Max:", "ERROR",
-        "X=retry S=keep", "Purge fluid!", "Overpressure!", "Too close to zero",
-        "Hold Mode", "Deadzones", "Default Curve", "Snap Threshold",
-        "Btn Debounce", "Refresh Rates", "Recalibrate", "Language", "Quick Save", "Save & Load",
-        "Save settings", "Saved!", "Low:", "High:", "USB/ADC:", "Display:", "ms", "Hz", "Redo", "Next",
-    },
-    // ---- LANG_ES ----
-    {
-        "E-BRAKE", "v1.2", "A.Belluscio", "BalduHandbrake", "Iniciando...",
-        "SOSTEN", "VIVO", "PSI", "V", "%",
-        "FALLO", "BAJA", "SOBRE",
-        "Juego", "Firmware",
-        "Guardar", "Cargar", "Vacio", "Guardado", "Perf",
-        "Baje palanca", "Tire palanca", "Estabilizando...", "Mantenga firme...",
-        "Muestreando...", "Calibracion OK", "Cero:", "Max:", "ERROR",
-        "X=rein S=guard", "Purgar fluido!", "Sobrepresion!", "Muy cerca de cero",
-        "Modo Espera", "Zonas Muertas", "Curva Default", "Umbral Snap",
-        "Antirrebote", "Tasas Refresco", "Recalibrar", "Idioma", "Guardo Rapido", "Guardar & Cargar",
-        "Guardar ajustes", "Guardado!",
-        "Bajo:", "Alto:", "USB/ADC:", "Pantalla:", "ms", "Hz", "Rehacer", "Seguir",
-    },
-};
-
-static const char* const LANG_NAMES[NUM_LANGUAGES] = { "English", "Espanol" };
 
 // ============================================================================
 //  LGFX custom class — exact physical wiring
@@ -73,17 +36,17 @@ public:
     bus_cfg.use_lock   = true;
     bus_cfg.dma_channel = SPI_DMA_CH_AUTO;
 
-    bus_cfg.pin_mosi = 11;   // DIN
-    bus_cfg.pin_miso = -1;
-    bus_cfg.pin_sclk = 12;   // CLK
-    bus_cfg.pin_dc   = 6;    // DC
+    bus_cfg.pin_mosi = OLED_MOSI;   // DIN
+    bus_cfg.pin_miso = OLED_MISO;
+    bus_cfg.pin_sclk = OLED_SCK;   // CLK
+    bus_cfg.pin_dc   = OLED_DC;    // DC
     _bus_instance.config(bus_cfg);
 
     _panel_instance.setBus(&_bus_instance);
 
     auto panel_cfg = _panel_instance.config();
-    panel_cfg.pin_cs     = 10;
-    panel_cfg.pin_rst    = 7;
+    panel_cfg.pin_cs     = OLED_CS;
+    panel_cfg.pin_rst    = OLED_RST;
     panel_cfg.pin_busy   = -1;
     panel_cfg.offset_x   = 0;
     panel_cfg.offset_y   = 0;
@@ -103,7 +66,7 @@ static LGFX lcd;    // global display object
 static uint8_t activeLang = LANG_EN;
 
 // Display hysteresis trackers
-static uint16_t lastDispDeciPsi     = 0xFFFF;
+static uint16_t lastDispdeciUnit     = 0xFFFF;
 static uint16_t lastDispDeciVolts   = 0xFFFF;
 static uint16_t lastDispDeciPercent = 0xFFFF;
 static bool     lastDispHold        = false;
@@ -135,22 +98,14 @@ static uint16_t prevArcPercent = 0xFFFF;
 //  String lookup
 // ============================================================================
 static const char* str(StringID id) {
-    if (activeLang >= NUM_LANGUAGES) return STRING_TABLE[LANG_EN][id];
-    if (id >= NUM_STRINGS) return "";
-    return STRING_TABLE[activeLang][id];
-}
-
-const char* displayGetString(StringID id, uint8_t language) {
-    if (language >= NUM_LANGUAGES) language = LANG_EN;
-    if (id >= NUM_STRINGS) return "";
-    return STRING_TABLE[language][id];
+    return strGet(id, activeLang);
 }
 
 // ============================================================================
 //  Helpers
 // ============================================================================
 static void resetDisplayHysteresis() {
-    lastDispDeciPsi     = 0xFFFF;
+    lastDispdeciUnit     = 0xFFFF;
     lastDispDeciVolts   = 0xFFFF;
     lastDispDeciPercent = 0xFFFF;
     lastDispHold        = false;
@@ -196,10 +151,6 @@ static void drawHoldIndicator(int16_t x, int16_t y, bool holdActive) {
     } else {
 		//Just blank it, we should move to just push the HOLD icon.
         lcd.fillRect(x, y, 60, 20, LIVE_BG_COLOR);
-        //lcd.setFont(&fonts::DejaVu18);
-        //lcd.setTextColor(LIVE_OK_COLOR, LIVE_BG_COLOR);
-        //lcd.setCursor(x, y);
-        //lcd.print(str(STR_LIVE));
     }
 }
 
@@ -410,7 +361,7 @@ void displaySetupLiveFull(const DeviceConfig& cfg) {
     lastDispCurveIndex = cfg.curveIndex;
     lcd.setFont(&fonts::DejaVu18);
     lcd.setTextColor(LIVE_LABEL_COLOR, LIVE_BG_COLOR);
-    lcd.setCursor(90, 26); lcd.print(str(STR_PSI));
+    lcd.setCursor(90, 26); lcd.print(str(STR_UNIT));
     lcd.setCursor(90, 48); lcd.print(str(STR_VOLTS));
     lcd.setCursor(90, 72); lcd.print(str(STR_PERCENT));
     lcd.drawRect(4, 116, 122, 12, LIVE_FG_COLOR);
@@ -423,13 +374,13 @@ void displayUpdateLiveFull(const LiveData& data, const DeviceConfig& cfg) {
     // Curve name (updates on change)
     updateCurveIfChanged(12, 1, cfg.curveIndex, 120);
 
-    // PSI
-    uint16_t deciPsi = (uint16_t)(data.centiPsi / 10u);
-    if (deciPsi != lastDispDeciPsi || errState != lastDispErrorState) {
+    // Unit, Psi/Kgf/etc.
+    uint16_t deciUnit = (uint16_t)(data.centiUnit / 10u);
+    if (deciUnit != lastDispdeciUnit || errState != lastDispErrorState) {
         lcd.fillRect(12, 26, 70, 16, LIVE_BG_COLOR);
         if (errState) printSensorStatus(12, 26, data, LIVE_BG_COLOR, &fonts::DejaVu18);
-        else printDeciValue(12, 26, deciPsi, LIVE_OK_COLOR, LIVE_BG_COLOR, &fonts::DejaVu18);
-        lastDispDeciPsi = deciPsi;
+        else printDeciValue(12, 26, deciUnit, LIVE_OK_COLOR, LIVE_BG_COLOR, &fonts::DejaVu18);
+        lastDispdeciUnit = deciUnit;
     }
 
     // Voltage
@@ -692,16 +643,6 @@ void displayUpdateLiveDark(const LiveData& data, uint8_t language) {
 }
 
 // ============================================================================
-//  Hold Mode Indicator (public — for setup-time use)
-// ============================================================================
-//void displayUpdateHoldIndicator(bool holdActive, uint8_t language) {
-//    activeLang = language;
-//    drawHoldIndicator(36, 90, holdActive);
-//    lastDispHold = holdActive;
-//    lastDispHoldInit = true;
-//}
-
-// ============================================================================
 //  Navigation Bar
 // ============================================================================
 static bool isNavBoxVisible(const UIState& ui, uint8_t index) {
@@ -724,12 +665,6 @@ static void drawNavBox(const UIState& ui, uint8_t index, bool isSelected) {
         }
         lcd.pushImage(x, y, 32, 20, (const lgfx::rgb565_t*)icon->data);
         return;
-        //uint16_t bg = isSelected ? NAV_SELECTED_BG : NAV_NORMAL_BG;
-        //lcd.fillRect(x, y, NAV_BOX_W, NAV_BOX_H, bg);
-        //uint16_t fg = isSelected ? NAV_SELECTED_FG : NAV_NORMAL_FG;
-        //lcd.setFont(&fonts::DejaVu18); lcd.setTextColor(fg, bg); lcd.setCursor(x + 10, y + 2);
-        //lcd.print((index == 2) ? 'S' : 'X');
-        //return;
     }
 
     // Normal arrow icons
@@ -848,7 +783,6 @@ void displayDrawSnapThreshold(const UIState& ui, const DeviceConfig& cfg) {
     int16_t baseY = CONTENT_Y + 24;
     lcd.setFont(&fonts::DejaVu24); lcd.setTextColor(EDIT_VALUE_COLOR, EDIT_BG_COLOR); lcd.setCursor(8, baseY+10);
     lcd.print(cfg.snapThreshold/10u); lcd.print("."); lcd.print(cfg.snapThreshold%10u); lcd.print(str(STR_PERCENT));
-    //int16_t ax = 100;
     drawEditIconBlock2x2(SCREEN_WIDTH - 32 - 2, baseY, EDIT_ICONS_4, 4, ui.menuScrollPos);
 }
 
@@ -925,7 +859,6 @@ void displayDrawCalibrate(const UIState& ui, const CalibData& calib, uint8_t lan
             lcd.setCursor(8, baseY+10); lcd.print(str(STR_CAL_MAX_OK));
             printDeciValue(8, baseY+24, calib.resultCentiVolts/10, EDIT_VALUE_COLOR, EDIT_BG_COLOR, &fonts::DejaVu18);
             lcd.setFont(&fonts::DejaVu9); lcd.setCursor(80, baseY+28); lcd.print(str(STR_VOLTS));
-//            lcd.setTextColor(EDIT_LABEL_COLOR); lcd.setCursor(8, baseY+50); lcd.print(str(STR_CAL_RETRY));
             break;
         case CALIB_DONE:
             lcd.setFont(&fonts::DejaVu9); lcd.setTextColor(LIVE_OK_COLOR, EDIT_BG_COLOR);
@@ -939,7 +872,6 @@ void displayDrawCalibrate(const UIState& ui, const CalibData& calib, uint8_t lan
             lcd.setCursor(8, baseY+10); lcd.print(str(STR_CAL_ERROR));
             lcd.setFont(&fonts::DejaVu9); lcd.setTextColor(LIVE_WARN_COLOR, EDIT_BG_COLOR);
             lcd.setCursor(8, baseY+34); if (calib.errorMsg) lcd.print(calib.errorMsg);
-//            lcd.setTextColor(EDIT_LABEL_COLOR); lcd.setCursor(8, baseY+52); lcd.print(str(STR_CAL_RETRY));
             break;
     }
     // Draw Redo and Next buttons at the bottom of the content area

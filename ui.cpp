@@ -13,6 +13,7 @@
 #include "display.h"
 #include "sensor.h"
 #include "storage.h"
+#include "strtable.h"
 #include <RotaryEncoder.h>
 
 // ============================================================================
@@ -264,11 +265,11 @@ static void calibUpdate(const LiveData& liveData, const DeviceConfig& ac, unsign
                 uint16_t result=processCalibSamples(calibData.samples,calibData.sampleCount,CALIB_OUTLIER_REJECT_PCT);
                 calibData.resultCentiVolts=(uint16_t)(((uint32_t)result*1875UL+50000UL)/100000UL);
                 if(isZero) {
-                    if(result<ADC_FAIL_THRESHOLD) { calibData.state=CALIB_ERROR; calibData.errorMsg=displayGetString(STR_CAL_PURGE,editConfig.language); }
+                    if(result<CALIB_REJECT_ZERO_LOW) { calibData.state=CALIB_ERROR; calibData.errorMsg=strGet(STR_CAL_PURGE,editConfig.language); }   //In load cell mode this error messaage makes no sense
                     else { calibData.resultAdcZero=result; calibData.state=CALIB_RESULT_ZERO; }
                 } else {
-                    if(result>ADC_OVER_THRESHOLD) { calibData.state=CALIB_ERROR; calibData.errorMsg=displayGetString(STR_CAL_OVERPRESS,editConfig.language); }
-                    else if(result<=calibData.resultAdcZero+500) { calibData.state=CALIB_ERROR; calibData.errorMsg=displayGetString(STR_CAL_TOO_LOW,editConfig.language); }
+                    if(result>CALIB_REJECT_MAX_HIGH) { calibData.state=CALIB_ERROR; calibData.errorMsg=strGet(STR_CAL_OVERPRESS,editConfig.language); }   //In load cell mode this error messaage makes no sense
+                    else if(result<=calibData.resultAdcZero+500) { calibData.state=CALIB_ERROR; calibData.errorMsg=strGet(STR_CAL_TOO_LOW,editConfig.language); }
                     else { calibData.resultAdcMax=result; calibData.state=CALIB_RESULT_MAX; }
                 }
                 forceFullRedraw=true;
