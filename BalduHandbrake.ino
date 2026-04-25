@@ -27,7 +27,7 @@
 
 #include <freertos/FreeRTOS.h>
 #include <freertos/task.h>
-#include <Wire.h>
+//#include <Wire.h>
 
 #include "config.h"
 #include "sensor.h"
@@ -212,8 +212,18 @@ void setup() {
     #endif
 
     // --- 3. I2C + ADC ---
-    Wire.begin(I2C_SDA_PIN, I2C_SCL_PIN);       // Setup the I2C bus pins
-    Wire.setClock(I2C_WIRE_SPEED);              // Set the bus speed to 400khz
+    //Wire.begin(I2C_SDA_PIN, I2C_SCL_PIN);       // Setup the I2C bus pins
+    //Wire.setClock(I2C_WIRE_SPEED);              // Set the bus speed to 400khz
+
+    //if (sensorInit()) {
+    //    Serial.print(ADS_SENSOR_NAME);
+    //    Serial.println(": OK");
+    //} else {
+    //    Serial.print(ADS_SENSOR_NAME);
+    //    Serial.println(": NOT FOUND");
+    //}
+
+    sensorBusInit();
 
     if (sensorInit()) {
         Serial.print(ADS_SENSOR_NAME);

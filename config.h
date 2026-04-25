@@ -31,8 +31,8 @@
 // ADC
 #define ADC_ADS1115
 //#define ADC_ADS122C04  //Preliminary work to support the ADS122C04
-//#define ADC_ADS122C04  //Preliminary work to support the ADS122C04
 //#define ADC_NAU7802    //Preliminary support of NAU7802 for load cells
+//#define ADC_HX711      //Preliminary support of HX711 for load cells
 
 // Sensor type
 #define SENSOR_PRESSURE_TRANSDUCER
@@ -84,6 +84,10 @@
 #define HOLD_BUTTON_PIN       7
 */
 
+
+// ============================================================================
+//  ADC ELECTRONIC PARAMETERS
+// ============================================================================
 //Address parameters defined here to keep all hardware configuration here.
 #ifdef ADC_ADS1115
     #define ADS1115_ADDR          0x48
@@ -91,6 +95,14 @@
     #define ADS122C04_ADDR        0x40
 #elif defined(ADC_NAU7802)
     // NAU7802 has fixed hardware address 0x2A — no configuration needed
+#elif defined(ADC_HX711)
+    // HX711 uses GPIO, not I2C — no address needed
+    // H711 GPIO assignments for Hardware V1.0
+    #define HX711_DOUT_PIN        8     // Data out (was I2C_SDA_PIN)
+    #define HX711_SCK_PIN         9     // Clock (was I2C_SCL_PIN)
+    // H711 GPIO assignments for Hardware V1.1
+    //#define HX711_SCK_PIN         3     // Clock (was I2C_SCL_PIN) 
+    //#define HX711_DOUT_PIN        2     // Data out (was I2C_SDA_PIN)
 #endif
 
 #define I2C_WIRE_SPEED        400000
@@ -113,15 +125,78 @@
 // Configure these to match your hardware. Only one block is active at a time.
 
 #ifdef SENSOR_LOAD_CELL
-    // Load cell spec — set from your cell's datasheet
-    // Example: 200 kgf cell, 2 mV/V sensitivity, 5V excitation
-    // Full-scale output = 2 * 5 = 10 mV
-    // At gain 128, ref 2.048V, 16-bit: 10mV → ~40960 counts
+    // ADC_SPEC_FULL depends on gain — see calculation guide below.
+    // counts = sensitivity_V_per_V × gain × 32768  (ratiometric mode)
+    // Example: 0.002 V/V × 128 × 32768 = 8389
+    //
+    // CHECK FOR OVERFLOW:
+    //   amplified_mV = sensitivity_mV_per_V × excitation_V × gain
+    //   This must be LESS than the ADC reference voltage:
+    //     ADS122C04 AVDD ref:  amplified_mV < AVDD (3300 or 5000 mV)
+    //     ADS122C04 internal:  amplified_mV < 2048 mV
+    //     NAU7802 LDO ref:     amplified_mV < LDO setting (3300 mV)
+    //     HX711 channel A:     amplified_mV < AVDD (always, gain is fixed)
+    //
+    //   Example: 3 mV/V cell, 3.3V excitation, gain 128
+    //     3 × 3.3 × 128 = 1267 mV — OK (< 3300 mV)
+    //
+    //   Example: 3 mV/V cell, 5V excitation, gain 128
+    //     3 × 5.0 × 128 = 1920 mV — OK if AVDD ref (< 5000 mV)
+    //                             — OVERFLOW if internal 2.048V ref!
+    //
+    //   If overflow: reduce gain. Try 64:
+    //     3 × 5.0 × 64 = 960 mV — OK for all references
+    #define SENSOR_ADC_GAIN             128     // PGA gain (1, 2, 4, 8, 16, 32, 64, 128)
+
+    // ====================================================================
+    //  LOAD CELL CONFIGURATION
+    // ====================================================================
+    // To calculate ADC_SPEC_FULL for your load cell and ADC combination:
+    //
+    // Step 1: Find your cell's full-scale output voltage
+    //   full_scale_mV = sensitivity_mV_per_V × excitation_V
+    //   Example: 2 mV/V cell with 5V excitation → 2 × 5 = 10 mV
+    //
+    // Step 2: Find your ADC's 16-bit input range (after >>8 from 24-bit)
+    //   The 16-bit signed range (±32767) maps to the ADC's full input range.
+    //   The input range depends on the ADC's reference voltage and gain:
+    //
+    //   ADS122C04 (gain 128, AVDD ratiometric reference):
+    //     Ratiometric mode — counts are independent of supply voltage.
+    //     counts = sensitivity_V_per_V × gain × 32768
+    //     Example: 0.002 V/V × 128 × 32768 = 8389
+    //     This value is the same whether AVDD is 3.3V or 5V,
+    //     as long as the load cell excitation comes from AVDD.
+    //
+    //   NAU7802 (gain 128, AVDD ref via LDO 3.3V):
+    //     input_range = ±3.3V / 128 = ±25.78 mV
+    //     counts = full_scale_mV / 25.78 × 32768
+    //     Example: 6.6 mV / 25.78 × 32768 = 8389
+    //     NOTE: If cell is powered from AVDD, measurement is ratiometric
+    //     and the counts formula simplifies to:
+    //     counts = sensitivity_mV_per_V × 32768 / 128 = sensitivity × 256
+    //
+    //   HX711 (gain 128, no internal ref, channel A):
+    //     input_range = ±20 mV
+    //     counts = full_scale_mV / 20.0 × 32768
+    //     Example: 10 mV / 20.0 × 32768 = 16384
+    //
+    // Step 3: Set ADC_SPEC_FULL to the value from Step 2.
+    //   Set ADC_SPEC_ZERO to 0 (bridge at rest outputs ~0 mV).
+    //
+    // Step 4: Set fault thresholds near the 16-bit rails (±32767).
+    //   These detect open-circuit conditions (disconnected cell).
+    //   Keep them above ADC_SPEC_FULL with enough margin for overload.
+    //
+    // Step 5: Set SENSOR_UNIT_MAX to your cell's rated capacity.
+    //   This is purely for the informational display — the game axis
+    //   is driven by calibration (calAdcZero / calAdcMax), not this value.
+    // ====================================================================
     #define SENSOR_UNIT_MAX             200     // kgf full scale
     #define ADC_SPEC_ZERO                 0     // bridge at rest (0 mV)
-    #define ADC_SPEC_FULL             40960     // bridge at rated load
-    #define ADC_FAIL_HIGH_THRESHOLD   32000     // positive rail: open circuit
-    #define ADC_FAIL_LOW_THRESHOLD   -32000     // negative rail: open circuit
+    #define ADC_SPEC_FULL              8389     // bridge at rated load
+    #define ADC_FAIL_HIGH_THRESHOLD   31000     // positive rail: open circuit
+    #define ADC_FAIL_LOW_THRESHOLD   -31000     // negative rail: open circuit
 #else
     // Pressure transducer spec — Ejoyous 0–500 PSI
     // 0.5V = 0 PSI, 4.5V = 500 PSI (ratiometric, 5V supply)
@@ -228,7 +303,15 @@ enum DisplayState : uint8_t {
 // ============================================================================
 //  DEFAULT BEHAVIOR
 // ============================================================================
-#define DEFAULT_SAMPLE_RATE_HZ    1000
+//#define DEFAULT_SAMPLE_RATE_HZ    1000
+
+#ifdef ADC_NAU7802
+    #define DEFAULT_SAMPLE_RATE_HZ    320
+#elif defined(ADC_HX711)
+    #define DEFAULT_SAMPLE_RATE_HZ     80
+#else
+    #define DEFAULT_SAMPLE_RATE_HZ   1000
+#endif
 #define DEFAULT_DISPLAY_RATE_HZ     30
 #define DEFAULT_DEBOUNCE_MS         50
 #define DEFAULT_ERROR_RESET_MS     250

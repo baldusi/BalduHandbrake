@@ -30,7 +30,10 @@
 //      f) adcRawToCentiVolts()     // Raw to true input voltage (gain-compensated)
 //      g) adcRawToCentiUnit()      // Raw to physical unit (spec-based)
 //      h) adcCheckFault()          // Sensor-specific fault detection
+// ============================================================================
 
+
+#include <Wire.h>
 #include <SparkFun_ADS122C04_ADC_Arduino_Library.h>
 
 static SFE_ADS122C04 ads;
@@ -41,6 +44,11 @@ static SFE_ADS122C04 ads;
 static const uint8_t ADC_REG_VALUES[] = { 3,    4,    5,    6    };
 const uint16_t SENSOR_RATE_OPTIONS[]  = { 175,  330,  600,  1000 };
 
+static void adcBusInit() {
+    Wire.begin(I2C_SDA_PIN, I2C_SCL_PIN);
+    Wire.setClock(I2C_WIRE_SPEED);
+}
+
 static bool adcBegin() { return ads.begin(ADS122C04_ADDR, Wire); }
 
 static void adcConfigure() {
@@ -50,6 +58,7 @@ static void adcConfigure() {
     ads.setDataIntegrityCheck(ADS122C04_CRC_DISABLED);              // Disable CRC checking (Note: the library does not currently support data integrity checking)
     ads.setConversionMode(ADS122C04_CONVERSION_MODE_CONTINUOUS);    // Use continuous mode
     ads.setOperatingMode(ADS122C04_OP_MODE_NORMAL);                 // Disable turbo mode
+	ads.enablePGA(ADS122C04_PGA_DISABLED);							// PGA only needed for GAIN > 4
     ads.setVoltageReference(ADS122C04_VREF_AVDD);                   // ADS122C04 must be fed fromt he same 5V rail as the transducer
     ads.enableInternalTempSensor(ADS122C04_TEMP_SENSOR_OFF);        // When using temp sensor on, you read the internal temp data, not the ADC
 }

@@ -29,9 +29,11 @@
 //      f) adcRawToCentiVolts()     // Raw to true input voltage (gain-compensated)
 //      g) adcRawToCentiUnit()      // Raw to physical unit (spec-based)
 //      h) adcCheckFault()          // Sensor-specific fault detection
+// ============================================================================
 
 
 //Rob Tillaart ADS1X15 library
+#include <Wire.h>
 #include <ADS1X15.h>
 
 static ADS1115 ads(ADS1115_ADDR);
@@ -41,6 +43,11 @@ static ADS1115 ads(ADS1115_ADDR);
 // ============================================================================
 static const uint8_t ADC_REG_VALUES[] = { 5,   6,   7,   7    };
 const uint16_t SENSOR_RATE_OPTIONS[]  = { 250, 475, 860, 1000 };
+
+static void adcBusInit() {
+    Wire.begin(I2C_SDA_PIN, I2C_SCL_PIN);
+    Wire.setClock(I2C_WIRE_SPEED);
+}
 
 static bool adcBegin() { return ads.begin(); }
 

@@ -27,13 +27,18 @@
     #define ADS_SENSOR_NAME "ADS122C04"
 #elif defined(ADC_NAU7802)
     #define ADS_SENSOR_NAME "NAU7802"
+#elif defined(ADC_HX711)
+    #define ADS_SENSOR_NAME "HX711"    
 #endif
 
 // ----------------------------------------------------------------------------
 //  Public API
 // ----------------------------------------------------------------------------
 
-// Initialize ADS1115: sets gain, data rate, continuous mode, first read.
+//Initializes the bus for the ADC. Be it I2C, SPI or custom. 
+void sensorBusInit();
+
+// Initialize ADC: sets gain, data rate, continuous mode, first read.
 // Returns true if the ADC was found and responded.
 bool sensorInit();
 

@@ -4,16 +4,41 @@
 // This file is #included directly into sensor.cpp. It is NOT a standalone
 // header — do not include it from any other translation unit.
 //
+// IMPORTANT: Connect BOTH ADC and laod cell to 3.3V rail!
+//
 // Differences from transducer mode:
 //   - Gain 128, PGA enabled (required for gain > 4)
 //   - Differential input (AIN0-AIN1)
-//   - Internal 2.048V reference (precision, not supply-dependent)
+//   - AVDD reference for truly ratiometric measuring.
 //   - Unit conversion uses full 24-bit raw for display precision
 //   - Fault detection checks both rail directions (open bridge)
 // ============================================================================
+
+#include <Wire.h>
 #include <SparkFun_ADS122C04_ADC_Arduino_Library.h>
 
 static SFE_ADS122C04 ads;
+
+// Map config.h gain value to ADS122C04 register enum
+#if SENSOR_ADC_GAIN == 1
+    #define ADS_GAIN_REG ADS122C04_GAIN_1
+#elif SENSOR_ADC_GAIN == 2
+    #define ADS_GAIN_REG ADS122C04_GAIN_2
+#elif SENSOR_ADC_GAIN == 4
+    #define ADS_GAIN_REG ADS122C04_GAIN_4
+#elif SENSOR_ADC_GAIN == 8
+    #define ADS_GAIN_REG ADS122C04_GAIN_8
+#elif SENSOR_ADC_GAIN == 16
+    #define ADS_GAIN_REG ADS122C04_GAIN_16
+#elif SENSOR_ADC_GAIN == 32
+    #define ADS_GAIN_REG ADS122C04_GAIN_32
+#elif SENSOR_ADC_GAIN == 64
+    #define ADS_GAIN_REG ADS122C04_GAIN_64
+#elif SENSOR_ADC_GAIN == 128
+    #define ADS_GAIN_REG ADS122C04_GAIN_128
+#else
+    #error "Invalid SENSOR_ADC_GAIN for ADS122C04. Valid: 1, 2, 4, 8, 16, 32, 64, 128"
+#endif
 
 static const uint8_t ADC_REG_VALUES[] = { 3,    4,    5,    6    };
 const uint16_t SENSOR_RATE_OPTIONS[]  = { 175,  330,  600,  1000 };
@@ -21,17 +46,27 @@ const uint16_t SENSOR_RATE_OPTIONS[]  = { 175,  330,  600,  1000 };
 // Full-resolution capture for unit conversion
 static int32_t lastRaw24 = 0;
 
+static void adcBusInit() {
+    Wire.begin(I2C_SDA_PIN, I2C_SCL_PIN);
+    Wire.setClock(I2C_WIRE_SPEED);
+}
+
 static bool adcBegin() { return ads.begin(ADS122C04_ADDR, Wire); }
 
 static void adcConfigure() {
-    ads.setGain(ADS122C04_GAIN_128);
+    ads.setGain(ADS_GAIN_REG);
     ads.setInputMultiplexer(ADS122C04_MUX_AIN0_AIN1);
-    ads.enablePGA(ADS122C04_PGA_ENABLED);
+    // PGA required for gain > 4
+    #if SENSOR_ADC_GAIN > 4
+        ads.enablePGA(ADS122C04_PGA_ENABLED);
+    #else
+        ads.enablePGA(ADS122C04_PGA_DISABLED);
+    #endif
     ads.setDataCounter(ADS122C04_DCNT_DISABLE);
     ads.setDataIntegrityCheck(ADS122C04_CRC_DISABLED);
     ads.setConversionMode(ADS122C04_CONVERSION_MODE_CONTINUOUS);
     ads.setOperatingMode(ADS122C04_OP_MODE_NORMAL);
-    ads.setVoltageReference(ADS122C04_VREF_INTERNAL);
+    ads.setVoltageReference(ADS122C04_VREF_AVDD);      // Ratiometric with cell excitation
 }
 
 static int16_t adcRead() {
@@ -42,21 +77,20 @@ static int16_t adcRead() {
 static void adcSetRate(uint8_t reg) { ads.setDataRate(reg); }
 
 static bool adcDataReady() {
-    #if ADC_DRDY_PIN >= 0
+    #if ADC_DRDY_PIN > 0
         return digitalRead(ADC_DRDY_PIN) == LOW;
     #else
         return ads.checkDataReady();
     #endif
 }
 
-// Gain 128, internal 2.048V reference
-// Input range = ±2.048V / 128 = ±16 mV
-// Report true bridge voltage (before gain) in centivolts
-// At 16-bit (24>>8): LSB ≈ 32mV / 65536 ≈ 0.488µV
-// centivolts = raw * 3200 / 65536 (in units of 0.01 mV)
+// Input range = ±Vref / gain
+// At AVDD 3.3V, gain from config: range = ±3300mV / gain
+// centi-mV per count = (3300 * 2 / gain) * 10000 / 65536
+// Simplified: raw * (66000 / SENSOR_ADC_GAIN) / 65536
 static uint16_t adcRawToCentiVolts(int16_t raw) {
     if (raw <= 0) return 0;
-    return (uint16_t)(((uint32_t)raw * 3200UL + 32768UL) / 65536UL);
+    return (uint16_t)(((uint32_t)raw * (66000UL / SENSOR_ADC_GAIN) + 32768UL) / 65536UL);
 }
 
 // 24-bit spec constants derived from 16-bit user config

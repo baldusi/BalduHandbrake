@@ -14,7 +14,7 @@
 
 #include "sensor.h"
 #include "curves.h"
-#include <Wire.h>
+//#include <Wire.h>
 
 // ============================================================================
 //  ADC selection at 
@@ -27,11 +27,19 @@
     #include "devices/ads122c04.h"
 #elif defined(ADC_NAU7802)
     #include "devices/nau7802.h"
+#elif defined(ADC_HX711)
+    #include "devices/hx711.h"
 #endif
 
 // Safety check: NAU7802 is load-cell only
 #if defined(ADC_NAU7802) && !defined(SENSOR_LOAD_CELL)
     #error "NAU7802 requires SENSOR_LOAD_CELL — it is a load cell amplifier, not a general-purpose ADC"
+#endif
+#if defined(ADC_NAU7802) && !defined(SENSOR_LOAD_CELL)
+    #error "NAU7802 requires SENSOR_LOAD_CELL"
+#endif
+#if defined(ADC_HX711) && !defined(SENSOR_LOAD_CELL)
+    #error "HX711 requires SENSOR_LOAD_CELL"
 #endif
 
 // ============================================================================
@@ -49,6 +57,15 @@ static uint8_t findRateIndex(uint16_t hz) {
 
 
 // ============================================================================
+//  sensorBusInit() Wrapper function for bus initialization. 
+// ============================================================================
+// It's needed for the .ino file to see the adcBusInit() on the shim driver
+
+void sensorBusInit() {
+    adcBusInit();
+}
+
+// ============================================================================
 //  Transducer spec constants (derived from config.h hardware defines)
 // ============================================================================
 // These define the transducer's physical voltage-to-pressure relationship.
@@ -58,7 +75,7 @@ static uint8_t findRateIndex(uint16_t hz) {
 
 
 // ============================================================================
-//  ensorUpdateDataRate()
+//  sensorUpdateDataRate()
 // ============================================================================
 void sensorUpdateDataRate(uint16_t sampleRateHz) {
     uint8_t idx = findRateIndex(sampleRateHz);

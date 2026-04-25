@@ -19,6 +19,8 @@
 // Fixed I2C address: 0x2A (hardware-defined, cannot be changed).
 // Multiple NAU7802 on the same bus require an I2C multiplexer.
 //
+// The ADC and the load cell should both use the same VCC!!!
+//
 // IMPORTANT: The NAU7802 requires an internal AFE calibration after any
 // change to gain, sample rate, or channel. adcSetRate() handles this
 // automatically.
@@ -40,9 +42,31 @@
 //      g) adcRawToCentiUnit()      // Raw to physical unit (spec-based)
 //      h) adcCheckFault()          // Sensor-specific fault detection
 
+#include <Wire.h>
 #include <SparkFun_Qwiic_Scale_NAU7802_Arduino_Library.h>
 
 static NAU7802 ads;
+
+#if SENSOR_ADC_GAIN == 1
+    #define ADS_GAIN_REG NAU7802_GAIN_1
+#elif SENSOR_ADC_GAIN == 2
+    #define ADS_GAIN_REG NAU7802_GAIN_2
+#elif SENSOR_ADC_GAIN == 4
+    #define ADS_GAIN_REG NAU7802_GAIN_4
+#elif SENSOR_ADC_GAIN == 8
+    #define ADS_GAIN_REG NAU7802_GAIN_8
+#elif SENSOR_ADC_GAIN == 16
+    #define ADS_GAIN_REG NAU7802_GAIN_16
+#elif SENSOR_ADC_GAIN == 32
+    #define ADS_GAIN_REG NAU7802_GAIN_32
+#elif SENSOR_ADC_GAIN == 64
+    #define ADS_GAIN_REG NAU7802_GAIN_64
+#elif SENSOR_ADC_GAIN == 128
+    #define ADS_GAIN_REG NAU7802_GAIN_128
+#else
+    #error "Invalid SENSOR_ADC_GAIN for NAU7802. Valid: 1, 2, 4, 8, 16, 32, 64, 128"
+#endif
+
 
 // ============================================================================
 //  ADC rate table — single source of truth for supported sample rates
@@ -57,17 +81,21 @@ const uint16_t SENSOR_RATE_OPTIONS[]  = { 10, 20, 40, 80, 320 };
 // Full-resolution capture for unit conversion
 static int32_t lastRaw24 = 0;
 
+static void adcBusInit() {
+    Wire.begin(I2C_SDA_PIN, I2C_SCL_PIN);
+    Wire.setClock(I2C_WIRE_SPEED);
+}
+
 static bool adcBegin() { return ads.begin(Wire); }
 
 static void adcConfigure() {
-    ads.setGain(NAU7802_GAIN_128);
+    ads.setGain(ADS_GAIN_REG);
     ads.setLDO(NAU7802_LDO_3V3);
     ads.setSampleRate(NAU7802_SPS_320);
     ads.setChannel(1);
     ads.calibrateAFE();
 }
 
-static bool adcDataReady() { return ads.available(); }
 
 static int16_t adcRead() {
     lastRaw24 = ads.getReading();
@@ -79,14 +107,15 @@ static void adcSetRate(uint8_t reg) {
     ads.calibrateAFE();     // Required after sample rate change
 }
 
-// NAU7802 at gain 128, internal reference ~1.2V
-// Input range = ±1.2V / 128 ≈ ±9.375 mV
-// Report true bridge voltage (before gain) in centivolts
-// At 16-bit (24>>8): full scale ≈ 9.375mV → 937 centi-mV
-// centivolts = raw * 1875 / 65536 (units of 0.01 mV)
+static bool adcDataReady() { return ads.available(); }
+
+// Input range = ±Vref / gain
+// At AVDD 3.3V, gain from config: range = ±3300mV / gain
+// centi-mV per count = (3300 * 2 / gain) * 10000 / 65536
+// Simplified: raw * (66000 / SENSOR_ADC_GAIN) / 65536
 static uint16_t adcRawToCentiVolts(int16_t raw) {
     if (raw <= 0) return 0;
-    return (uint16_t)(((uint32_t)raw * 1875UL + 32768UL) / 65536UL);
+    return (uint16_t)(((uint32_t)raw * (66000UL / SENSOR_ADC_GAIN) + 32768UL) / 65536UL);
 }
 
 // 24-bit spec constants derived from 16-bit user config
