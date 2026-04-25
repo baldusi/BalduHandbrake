@@ -3,4 +3,4 @@ build/
 *.elf
 .vscode/
 .theia/
-hardware/working/.theia/
+hardware/working/
