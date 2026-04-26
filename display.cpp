@@ -115,9 +115,9 @@ static void resetDisplayHysteresis() {
 }
 
 static uint8_t getErrorState(const LiveData& data) {
-    return (data.transducerFail ? 0x01 : 0x00)
-         | (data.pressureLow   ? 0x02 : 0x00)
-         | (data.saturationFail? 0x04 : 0x00);
+    return (data.sensorFail ? 0x01 : 0x00)
+         | (data.sensorLow   ? 0x02 : 0x00)
+         | (data.sensorSaturation? 0x04 : 0x00);
 }
 
 static void printDeciValue(int16_t x, int16_t y, uint16_t deciVal,
@@ -134,11 +134,11 @@ static void printSensorStatus(int16_t x, int16_t y, const LiveData& data,
                                uint16_t bg_color, const lgfx::IFont* font = &fonts::DejaVu12) {
     lcd.setFont(font);
     lcd.setCursor(x, y);
-    if (data.transducerFail) {
+    if (data.sensorFail) {
         lcd.setTextColor(LIVE_ERROR_COLOR, bg_color); lcd.print(str(STR_FAIL));
-    } else if (data.pressureLow) {
+    } else if (data.sensorLow) {
         lcd.setTextColor(LIVE_WARN_COLOR, bg_color); lcd.print(str(STR_LOW));
-    } else if (data.saturationFail) {
+    } else if (data.sensorSaturation) {
         lcd.setTextColor(LIVE_ERROR_COLOR, bg_color); lcd.print(str(STR_OVER));
     }
 }
@@ -362,7 +362,7 @@ void displaySetupLiveFull(const DeviceConfig& cfg) {
     lcd.setFont(&fonts::DejaVu18);
     lcd.setTextColor(LIVE_LABEL_COLOR, LIVE_BG_COLOR);
     lcd.setCursor(90, 26); lcd.print(str(STR_UNIT));
-    lcd.setCursor(90, 48); lcd.print(str(STR_VOLTS));
+    lcd.setCursor(90, 48); lcd.print(str(STR_VOLT_UNIT));
     lcd.setCursor(90, 72); lcd.print(str(STR_PERCENT));
     lcd.drawRect(4, 116, 122, 12, LIVE_FG_COLOR);
 }
@@ -846,7 +846,7 @@ void displayDrawCalibrate(const UIState& ui, const CalibData& calib, uint8_t lan
             lcd.setFont(&fonts::DejaVu9); lcd.setTextColor(LIVE_OK_COLOR, EDIT_BG_COLOR);
             lcd.setCursor(8, baseY+10); lcd.print(str(STR_CAL_ZERO_OK));
             printDeciValue(8, baseY+24, calib.resultCentiVolts/10, EDIT_VALUE_COLOR, EDIT_BG_COLOR, &fonts::DejaVu18);
-            lcd.setFont(&fonts::DejaVu9); lcd.setCursor(80, baseY+28); lcd.print(str(STR_VOLTS));
+            lcd.setFont(&fonts::DejaVu9); lcd.setCursor(80, baseY+28); lcd.print(str(STR_VOLT_UNIT));
 //            lcd.setTextColor(EDIT_LABEL_COLOR); lcd.setCursor(8, baseY+50); lcd.print(str(STR_CAL_RETRY));
             break;
         case CALIB_PROMPT_MAX:
@@ -858,7 +858,7 @@ void displayDrawCalibrate(const UIState& ui, const CalibData& calib, uint8_t lan
             lcd.setFont(&fonts::DejaVu9); lcd.setTextColor(LIVE_OK_COLOR, EDIT_BG_COLOR);
             lcd.setCursor(8, baseY+10); lcd.print(str(STR_CAL_MAX_OK));
             printDeciValue(8, baseY+24, calib.resultCentiVolts/10, EDIT_VALUE_COLOR, EDIT_BG_COLOR, &fonts::DejaVu18);
-            lcd.setFont(&fonts::DejaVu9); lcd.setCursor(80, baseY+28); lcd.print(str(STR_VOLTS));
+            lcd.setFont(&fonts::DejaVu9); lcd.setCursor(80, baseY+28); lcd.print(str(STR_VOLT_UNIT));
             break;
         case CALIB_DONE:
             lcd.setFont(&fonts::DejaVu9); lcd.setTextColor(LIVE_OK_COLOR, EDIT_BG_COLOR);

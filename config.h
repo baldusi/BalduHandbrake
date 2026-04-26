@@ -415,9 +415,9 @@ struct LiveData {
     uint16_t centiPercent;
     uint16_t axisOutput;
     bool     holdActive;
-    bool     pressureLow;
-    bool     transducerFail;
-    bool     saturationFail;
+    bool     sensorLow;         // Below calibrated zero (low pressure / negative force)
+    bool     sensorFail;        // Sensor disconnected or open circuit
+    bool     sensorSaturation;  // Over range (overpressure / rail saturation)
 };
 
 // ============================================================================

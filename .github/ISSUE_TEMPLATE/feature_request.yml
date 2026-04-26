@@ -1,0 +1,56 @@
+---
+
+name: Feature Request / Enhancement
+description: Suggest a new feature, ADC support, curve, language, or improvement.
+title: "[ENHANCEMENT] "
+labels: ["enhancement"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Feature requests are welcome.  
+        The project is deliberately extensible via the devices/ abstraction layer.
+
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem or Use-Case
+      description: What problem are you trying to solve? (e.g. “I want to use a different pressure transducer model XYZ”)
+    validations:
+      required: true
+
+  - type: textarea
+    id: solution
+    attributes:
+      label: Proposed Solution
+      description: Describe the feature you would like. Include formulas, hardware references, or code sketches if possible.
+
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternative Solutions
+      description: Any other ways you have considered?
+
+  - type: dropdown
+    id: impact
+    attributes:
+      label: Impact Area
+      options:
+        - New ADC shim (devices/)
+        - New response curve (curves.h)
+        - UI / OLED / multi-language
+        - Mechanical / hardware reference
+        - Documentation
+        - Performance / FreeRTOS
+        - Other
+    validations:
+      required: true
+
+  - type: checkboxes
+    id: checklist
+    attributes:
+      label: Checklist
+      options:
+        - label: I have checked that this is not already implemented in the latest release.
+          required: true
+        - label: I am willing to help implement / test this feature (optional but highly appreciated).

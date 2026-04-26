@@ -130,15 +130,15 @@ void sensorTask(void* param) {
         // --- Publish to shared state for Core 1 ---
         // Volatile write — field-by-field is fine, no mutex needed.
         LiveData* dest = (LiveData*)&liveData;
-        dest->rawAdc         = localData.rawAdc;
-        dest->centiVolts     = localData.centiVolts;
-        dest->centiUnit      = localData.centiUnit;
-        dest->centiPercent   = localData.centiPercent;
-        dest->axisOutput     = localData.axisOutput;
-        dest->holdActive     = localData.holdActive;
-        dest->pressureLow    = localData.pressureLow;
-        dest->transducerFail = localData.transducerFail;
-        dest->saturationFail = localData.saturationFail;
+        dest->rawAdc           = localData.rawAdc;
+        dest->centiVolts       = localData.centiVolts;
+        dest->centiUnit        = localData.centiUnit;
+        dest->centiPercent     = localData.centiPercent;
+        dest->axisOutput       = localData.axisOutput;
+        dest->holdActive       = localData.holdActive;
+        dest->sensorLow        = localData.sensorLow;
+        dest->sensorFail       = localData.sensorFail;
+        dest->sensorSaturation = localData.sensorSaturation;
 
         // --- Precise 1ms timing (overflow-safe) ---
         vTaskDelayUntil(&xLastWakeTime, pdMS_TO_TICKS(1));
@@ -160,15 +160,15 @@ void uiTask(void* param) {
         // Read shared state (volatile → local copy for consistency)
         LiveData localData;
         const volatile LiveData* src = &liveData;
-        localData.rawAdc         = src->rawAdc;
-        localData.centiVolts     = src->centiVolts;
-        localData.centiUnit      = src->centiUnit;
-        localData.centiPercent   = src->centiPercent;
-        localData.axisOutput     = src->axisOutput;
-        localData.holdActive     = src->holdActive;
-        localData.pressureLow    = src->pressureLow;
-        localData.transducerFail = src->transducerFail;
-        localData.saturationFail = src->saturationFail;
+        localData.rawAdc           = src->rawAdc;
+        localData.centiVolts       = src->centiVolts;
+        localData.centiUnit        = src->centiUnit;
+        localData.centiPercent     = src->centiPercent;
+        localData.axisOutput       = src->axisOutput;
+        localData.holdActive       = src->holdActive;
+        localData.sensorLow        = src->sensorLow;
+        localData.sensorFail       = src->sensorFail;
+        localData.sensorSaturation = src->sensorSaturation;
 
         // Run UI cycle
         uiUpdate(localData, activeConfig, pendingConfig, configDirty, nowMs);

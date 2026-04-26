@@ -240,11 +240,11 @@ void sensorUpdate(const DeviceConfig& cfg, LiveData& out) {
     // 2. Fault detection (driver-specific)
     // ------------------------------------------------------------------
     uint8_t fault = adcCheckFault(adcRaw);
-    out.transducerFail = (fault & FAULT_DISCONNECTED) != 0;
-    out.saturationFail = (fault & FAULT_SATURATION) != 0;
+    out.sensorFail = (fault & FAULT_DISCONNECTED) != 0;
+    out.sensorSaturation = (fault & FAULT_SATURATION) != 0;
 
     if (fault & FAULT_DISCONNECTED) {
-        out.pressureLow    = false;
+        out.sensorLow      = false;
         out.centiUnit      = 0;
         out.centiPercent   = 0;
         out.axisOutput     = Z_AXIS_MIN;
@@ -252,15 +252,15 @@ void sensorUpdate(const DeviceConfig& cfg, LiveData& out) {
     }
 
     if (fault & FAULT_SATURATION) {
-        out.pressureLow    = false;
+        out.sensorLow      = false;
         out.centiUnit      = (uint32_t)SENSOR_UNIT_MAX * 108UL;
         out.centiPercent   = 10000;
         out.axisOutput     = Z_AXIS_MAX;
         return;
     }
 
-    out.transducerFail = false;
-    out.saturationFail = false;
+    out.sensorFail = false;
+    out.sensorSaturation = false;
 
     // ------------------------------------------------------------------
     // 3. Compute informational unit value (from sensor spec, not calibration)
@@ -270,7 +270,7 @@ void sensorUpdate(const DeviceConfig& cfg, LiveData& out) {
     // ------------------------------------------------------------------
     // 4. Check for low pressure/force warning
     // ------------------------------------------------------------------
-    out.pressureLow = (adcRaw < (int16_t)cfg.calAdcZero);
+    out.sensorLow  = (adcRaw < (int16_t)cfg.calAdcZero);
 
     // ------------------------------------------------------------------
     // 5. Apply deadzones and normalize to Z-axis range

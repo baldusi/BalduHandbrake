@@ -22,7 +22,7 @@ All user definable variables, like GPIO pins, bus address, gain, etc, are expose
 |#include| Definition|
 |-|-|
 | **< BUS LIBRARY >** | I²C or SPI, generally custom buses like the HX711's are included in the same library.|
-| **< DEVICE LIBRARY >** | The ADC handling library. You should chose a reliable, well supported library. But special care must be taken to chose those that use mostly integrar math. Most of the efforts on data transformation functions went into avoiding floating point functions.|
+| **< DEVICE LIBRARY >** | The ADC handling library. You should chose a reliable, well supported library. But special care must be taken to chose those that use mostly integer math. Most of the efforts on data transformation functions went into avoiding floating point functions.|
 
 ### Variables
 |Name | type | definition|
@@ -43,7 +43,7 @@ All user definable variables, like GPIO pins, bus address, gain, etc, are expose
 | `adcRead` | `int16_t ()` | Return raw as 16-bit |
 | `adcSetRate` | `void (uint8_t reg)` | Change sample rate using  |
 | `adcDataReady` | `bool ()` | Poll ADC if new data ready. If no method is available, always return true. |
-| `adcRawToCentiVolts` | `uint16_t (int16_t raw)` | Return true input voltage * 100 |
+| `adcRawToCentiVolts` | `uint16_t (int16_t raw)` | Return true input voltage in centivolts for transducers, or centi-millivolts for load cells (gain-compensated, reflecting actual bridge voltage before amplification).|
 | `adcRawToCentiUnit` | `uint32_t (int16_t raw)` | Spec-based physical unit |
 | `adcCheckFault` | `uint8_t (int16_t raw)` | Sensor fault detection |
 
@@ -68,17 +68,20 @@ static ADS1115 ads(ADS1115_ADDR);
 static const uint8_t ADC_REG_VALUES[] = { 5,   6,   7,   7    };
 const uint16_t SENSOR_RATE_OPTIONS[]  = { 250, 475, 860, 1000 };
 
+
 static void adcBusInit() {
-    Wire.begin(I2C_SDA_PIN, I2C_SCL_PIN);
-    Wire.setClock(I2C_WIRE_SPEED);
+    Wire.begin(I2C_SDA_PIN, I2C_SCL_PIN);		// Initialize the I²C bus
+    Wire.setClock(I2C_WIRE_SPEED);				// Set the I²C speed. The ESP32-S3 Zero only supports up to 400kHz
 }
 
-static bool adcBegin() { return ads.begin(); }
+static bool adcBegin() {
+	return ads.begin();
+}	// Obtain the ADC object handle
 
 static void adcConfigure() {
-    ads.setGain(0);
-    ads.setMode(0);
-    ads.requestADC(0);
+    ads.setGain(ADS1X15_GAIN_6144MV);			// Only gain compatible with 5V.
+    ads.setMode(ADS1X15_MODE_CONTINUOUS);		// Sets continuous mode
+    ads.requestADC(0);							// Sets the reads on channel 0.
 }
 
 static bool adcDataReady() { return true; }  // No DRDY, accept duplicates
@@ -110,7 +113,7 @@ static uint8_t adcCheckFault(int16_t raw) {
 }
 ```
 #### Load Cell
-````
+```
 // ============================================================================
 // devices/nau7802.h — NAU7802 load cell mode for sensor.cpp
 // ============================================================================
@@ -155,8 +158,8 @@ const uint16_t SENSOR_RATE_OPTIONS[]  = { 10, 20, 40, 80, 320 };
 static int32_t lastRaw24 = 0;
 
 static void adcBusInit() {
-    Wire.begin(I2C_SDA_PIN, I2C_SCL_PIN);
-    Wire.setClock(I2C_WIRE_SPEED);
+    Wire.begin(I2C_SDA_PIN, I2C_SCL_PIN);		// Initialize the I²C bus
+    Wire.setClock(I2C_WIRE_SPEED);				// Set the I²C speed. The ESP32-S3 Zero only supports up to 400kHz
 }
 
 static bool adcBegin() { return ads.begin(Wire); }
@@ -164,9 +167,7 @@ static bool adcBegin() { return ads.begin(Wire); }
 static void adcConfigure() {
     ads.setGain(ADS_GAIN_REG);
     ads.setLDO(NAU7802_LDO_3V3);
-    ads.setSampleRate(NAU7802_SPS_320);
-    ads.setChannel(1);
-    ads.calibrateAFE();
+    ads.setChannel(NAU7802_CHANNEL_1);
 }
 
 

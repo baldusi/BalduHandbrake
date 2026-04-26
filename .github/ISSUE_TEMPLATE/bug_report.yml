@@ -1,0 +1,80 @@
+---
+
+name: Bug Report
+description: Report a reproducible problem with the firmware or hardware abstraction.
+title: "[BUG] "
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thank you for reporting a bug.  
+        Please fill in all fields below — incomplete reports will be closed.
+
+  - type: input
+    id: version
+    attributes:
+      label: BalduHandbrake Version
+      description: Exact version string shown on OLED or from `VERSION` define in config.h
+      placeholder: "1.4"
+    validations:
+      required: true
+
+  - type: dropdown
+    id: adc
+    attributes:
+      label: ADC / Sensor Type
+      description: Which ADC shim are you using?
+      options:
+        - ADS1115 (pressure transducer)
+        - NAU7802 (load cell)
+        - HX711
+        - ADS122C04
+        - Other (please specify in description)
+    validations:
+      required: true
+
+  - type: textarea
+    id: reproduction
+    attributes:
+      label: Steps to Reproduce
+      description: Exact sequence that triggers the bug (include calibration steps if relevant)
+      placeholder: |
+        1. Flash firmware 1.4
+        2. Select NAU7802 in config.h
+        3. Power on with 5V transducer
+        4. Enter calibration
+        5. ...
+    validations:
+      required: true
+
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected Behaviour
+      description: What should have happened?
+
+  - type: textarea
+    id: actual
+    attributes:
+      label: Actual Behaviour
+      description: What actually happened? (include any serial output, OLED messages, or crash behaviour)
+
+  - type: textarea
+    id: logs
+    attributes:
+      label: Logs / Screenshots / Additional Context
+      description: Paste any serial monitor output, attach screenshots of OLED, wiring photos, or raw sensor values. Drag-and-drop files here.
+      render: shell
+
+  - type: checkboxes
+    id: checklist
+    attributes:
+      label: Checklist
+      options:
+        - label: I have searched existing issues and this is not a duplicate.
+          required: true
+        - label: I am using the latest release (or have tested against main).
+          required: true
+        - label: The bug occurs on real hardware (not just simulator).
+          required: true

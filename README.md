@@ -182,7 +182,7 @@ Six response curves are available, switchable live during gameplay:
 | Wet | t^3.5 | Very soft initial response, prevents lockup |
 | S-Curve | sigmoid | Soft at extremes, steep in the middle |
 
-Curves that use mathematical functions are precomputed as 1025-entry lookup tables (1024 segments + sentinel for interpolation). The per-sample cost is a single array lookup with 2-bit fractional linear interpolation — no floating-point math in the sensor pipeline.
+The six selectable response curves are precomputed lookup tables (or direct computations for Linear and Drift Snap) that remap the raw 0–4095 Z-axis value after deadzone processing. Each LUT is composed of 1025-entry lookup tables (1024 segments + sentinel for interpolation). The per-sample cost is a single array lookup with 2-bit fractional linear interpolation — no floating-point math in the sensor pipeline. The math and Python code used to generate the LUT curves is in `curves.h`.
 
 ### Menu System
 

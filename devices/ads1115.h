@@ -44,17 +44,20 @@ static ADS1115 ads(ADS1115_ADDR);
 static const uint8_t ADC_REG_VALUES[] = { 5,   6,   7,   7    };
 const uint16_t SENSOR_RATE_OPTIONS[]  = { 250, 475, 860, 1000 };
 
+
 static void adcBusInit() {
-    Wire.begin(I2C_SDA_PIN, I2C_SCL_PIN);
-    Wire.setClock(I2C_WIRE_SPEED);
+    Wire.begin(I2C_SDA_PIN, I2C_SCL_PIN);		// Initialize the I²C bus
+    Wire.setClock(I2C_WIRE_SPEED);				// Set the I²C speed. The ESP32-S3 Zero only supports up to 400kHz
 }
 
-static bool adcBegin() { return ads.begin(); }
+static bool adcBegin() {
+	return ads.begin();
+}	// Obtain the ADC object handle
 
 static void adcConfigure() {
-    ads.setGain(0);
-    ads.setMode(0);
-    ads.requestADC(0);
+    ads.setGain(ADS1X15_GAIN_6144MV);			// Only gain compatible with 5V.
+    ads.setMode(ADS1X15_MODE_CONTINUOUS);		// Sets continuous mode
+    ads.requestADC(0);							// Sets the reads on channel 0.
 }
 
 static bool adcDataReady() { return true; }  // No DRDY, accept duplicates

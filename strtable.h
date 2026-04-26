@@ -26,6 +26,7 @@ enum StringID : uint8_t {
 	STR_PSI,
   STR_FORCE,
 	STR_VOLTS,
+	STR_MILLIVOLTS,
 	STR_PERCENT,
   STR_FAIL,
 	STR_LOW,
@@ -77,9 +78,11 @@ enum StringID : uint8_t {
 //  Unit abstraction — display code uses STR_UNIT everywhere
 // ============================================================================
 #ifdef SENSOR_LOAD_CELL
-    #define STR_UNIT  STR_FORCE
+    #define STR_UNIT      STR_FORCE
+    #define STR_VOLT_UNIT STR_MILLIVOLTS
 #else
-    #define STR_UNIT  STR_PSI
+    #define STR_UNIT      STR_PSI
+    #define STR_VOLT_UNIT STR_VOLTS
 #endif
 
 // ============================================================================

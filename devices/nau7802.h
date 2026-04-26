@@ -82,8 +82,8 @@ const uint16_t SENSOR_RATE_OPTIONS[]  = { 10, 20, 40, 80, 320 };
 static int32_t lastRaw24 = 0;
 
 static void adcBusInit() {
-    Wire.begin(I2C_SDA_PIN, I2C_SCL_PIN);
-    Wire.setClock(I2C_WIRE_SPEED);
+    Wire.begin(I2C_SDA_PIN, I2C_SCL_PIN);		// Initialize the I²C bus
+    Wire.setClock(I2C_WIRE_SPEED);				// Set the I²C speed. The ESP32-S3 Zero only supports up to 400kHz
 }
 
 static bool adcBegin() { return ads.begin(Wire); }
@@ -91,9 +91,7 @@ static bool adcBegin() { return ads.begin(Wire); }
 static void adcConfigure() {
     ads.setGain(ADS_GAIN_REG);
     ads.setLDO(NAU7802_LDO_3V3);
-    ads.setSampleRate(NAU7802_SPS_320);
-    ads.setChannel(1);
-    ads.calibrateAFE();
+    ads.setChannel(NAU7802_CHANNEL_1);
 }
 
 

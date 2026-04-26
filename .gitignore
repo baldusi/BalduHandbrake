@@ -1,6 +1,8 @@
-build/
 *.bin
 *.elf
-.vscode/
+.obsidian
 .theia/
+.vscode/
+build/
 hardware/working/
+workingdocs/

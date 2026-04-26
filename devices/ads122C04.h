@@ -45,8 +45,8 @@ static const uint8_t ADC_REG_VALUES[] = { 3,    4,    5,    6    };
 const uint16_t SENSOR_RATE_OPTIONS[]  = { 175,  330,  600,  1000 };
 
 static void adcBusInit() {
-    Wire.begin(I2C_SDA_PIN, I2C_SCL_PIN);
-    Wire.setClock(I2C_WIRE_SPEED);
+    Wire.begin(I2C_SDA_PIN, I2C_SCL_PIN);		// Initialize the I²C bus
+    Wire.setClock(I2C_WIRE_SPEED);				// Set the I²C speed. The ESP32-S3 Zero only supports up to 400kHz
 }
 
 static bool adcBegin() { return ads.begin(ADS122C04_ADDR, Wire); }
