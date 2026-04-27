@@ -1,0 +1,126 @@
+BalduHandbrake
+Version: V1.1-Integrated
+PCB Design
+
+Integrated IC:
+
+ADS122C04IPWR
+TXS0108EPWR
+Wavesahre ESP32-S3 Zero
+
+Externally connected (0.1" connectors)
+Waveshare SSD1351 Board (1.5inch RGB OLED Display Module, 65K RGB Colors, 128×128, SPI)
+Ejoyus 500psi transducer
+KY-040 Rotary Encoder
+Momentary Button
+
+
+ESP32-S3 to SSD1351 (8pin 0.1" straight connector)
+OUT 	 -> VCC
+GND 	 -> GND
+GPIO 13	 -> DIN/MOSI
+GPIO 12	 -> CLK
+GPIO 11  -> DOUT/MISO 
+GPIO 10	 -> CS
+GPIO  9	 -> DC
+GPIO  8	 -> RST
+
+
+ESP32-S3 to Momentary Button (2pin 0.1" straight connector)
+GND 	 -> GND
+GPIO 7	 -> Momentary Button
+Add a  100uF (107) capacitors between Button and GND
+
+
+ESP32-S3 -> KY-040 Rotary Encoder (5pin 0.1" straight connector)
+OUT 	 -> VCC
+GND 	 -> GND
+GPIO 4	 -> CLK
+GPIO 5	 -> DT
+GPIO 6	 -> SW
+Add a  100uF (107) capacitors between SW and GND
+Add a  10uF (106) capacitors between CLK and GND
+Add a  10uF (106) capacitors between DT and GND
+
+
+ESP32-S3 to TXS0108EPWR
+OUT 	 -> VCCA
+GND 	 -> GND
+GPIO 1   -> A1
+GPIO 2 	 -> A2
+GPIO 3	 -> A3
+5V 	 -> VCCB
+GND 	 -> GND
+
+
+TXS0108EPWR to ADS122C04IPWR
+B1	-> DRDY
+B2	-> SDA
+B3      -> SCL
+Add the capacitors and resistors that are required around the TXS0108EPWR block according to the datasheet.
+
+
+Transducer 1 (4pin 0.1" straight connector)
+E+      ->  ESP32-S3 5V
+E-      ->  ESP32-S3 GND
+S+/Out1 ->  220R resistor -> ADS122C04IPWR  AIN0
+S-/Out2 ->  220R resistor -> ADS122C04IPWR  AIN1
+
+Add a 100nF (104) capacitor as close as possible to E+ and E-
+Further out a 10nF (106) capacitor between E+ and E-
+Add a 100nF (104) capacitors between E+ and E-
+Add a 100nF (104) capacitors between S+ and GND
+Add a 100nF (104) capacitors between S- and GND
+
+Transducer 2 (4pin 0.1" straight connector)
+E+      ->  ESP32-S3 5V
+E-      ->  ESP32-S3 GND
+S+/Out1 ->  220R resistor -> ADS122C04IPWR  AIN2
+S-/Out2 ->  220R resistor -> ADS122C04IPWR  AIN3
+
+Add a 100nF (104) capacitor as close as possible to E+ and E-
+Further out a 10nF (106) capacitor between E+ and E-
+Add a 100nF (104) capacitors between E+ and E-
+Add a 100nF (104) capacitors between S+ and GND
+Add a 100nF (104) capacitors between S- and GND
+
+
+ADS122C04IPWR (power from ESP32-S3 5V rail and the rest of the pinout should be fully defined, I'm just double checking)
+
+DVDD   ->   ESP32-S3 5V
+DGND   ->   ESP32-S3 GND
+AVDD   ->   ESP32-S3 5V
+AVSS   ->   ESP32-S3 GND
+A0     ->   ESP32-S3 GND
+A1     ->   ESP32-S3 GND
+DRDY   ->   TXS0108EPWR B1
+SDA    ->   TXS0108EPWR B2
+SCL    ->   TXS0108EPWR B3
+AIN0   ->   220R resistor  -> Transducer E+
+AIN0   ->   220R resistor  -> Transducer E-
+
+
+Add a pulldown resistor (4.7kR) between SCL and GND
+Add a 100nF (104) capacitor as close as possible to DVDD and DGND
+Further out a 10nF (106) capacitor between DVDD and DGND
+Add a 100nF (104) capacitor as close as possible to AVDD and AVSS
+Further out a 10nF (106) capacitor between AVDD and AVSS
+Add the capacitors and resistors that are required around the TXS0108EPWR block according to the datasheet.
+
+
+
+IF you can, add the bottom pins to a second SPI:
+
+ESP32-S3 to SPI3 (8pin 0.1" straight connector)
+OUT 	 -> VCC
+GND 	 -> GND
+GPIO 45	 -> DIN/MOSI
+GPIO 42	 -> CLK
+GPIO 40  -> DOUT/MISO 
+GPIO 39	 -> CS
+GPIO 38	 -> DC
+GPIO 18	 -> RST
+
+Plus use the GPIO 17 to have a RST pin on the ADS122C04
+GPIO 17  -> ADS122C04IPWR RST
+Add any resistor and/or capacitor that the ADS122C04 datasheet recommends

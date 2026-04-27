@@ -105,7 +105,13 @@ static void adcSetRate(uint8_t reg) {
     ads.calibrateAFE();     // Required after sample rate change
 }
 
-static bool adcDataReady() { return ads.available(); }
+static bool adcDataReady() {
+    #if ADC_DRDY_PIN >= 0
+        return digitalRead(ADC_DRDY_PIN) == LOW;   // GPIO: nanoseconds
+    #else
+        return ads.available();                    // I2C register poll: ~100µs
+    #endif
+}
 
 // Input range = ±Vref / gain
 // At AVDD 3.3V, gain from config: range = ±3300mV / gain

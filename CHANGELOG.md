@@ -5,6 +5,13 @@ All notable changes to **BalduHandbrake** will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),  
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.5.6] - 2026-04-27
+### Added
+- `nau7802.h` support for DRDY pin
+
+### Fixed
+- `config.h` ADC_DRDY_PIN define and added support for the NAU7802
+
 ## [1.5.5] - 2026-04-27
 ### Changed
 - `ads122c04.h` renamed `ads122c04` from capital C to lowercase c

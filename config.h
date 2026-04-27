@@ -22,7 +22,7 @@
 //  FIRMWARE VERSION
 // ============================================================================
 // Update this for every release. Format: MAJOR.MINOR.PATCH
-#define FW_VERSION          "v1.5.5"
+#define FW_VERSION          "v1.5.6"
 #define FW_BUILD            __DATE__ " " __TIME__   // or use a CI build number later
 
 // ============================================================================
@@ -72,10 +72,10 @@
 //for vias and using the bottom plane to cross the VCC.
 */
 
-#ifdef ADC_ADS122C04
-    #define ADS_DRDY_PIN            1
+#if defined(ADC_ADS122C04) || defined(ADC_NAU7802)
+    #define ADC_DRDY_PIN            1
 #else
-    #define ADS_DRDY_PIN            -1
+    #define ADC_DRDY_PIN            -1
 #endif
 
 #define I2C_SCL_PIN           2
