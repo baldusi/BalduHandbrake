@@ -22,7 +22,7 @@
 //  FIRMWARE VERSION
 // ============================================================================
 // Update this for every release. Format: MAJOR.MINOR.PATCH
-#define FW_VERSION          "v1.5.4"
+#define FW_VERSION          "v1.5.5"
 #define FW_BUILD            __DATE__ " " __TIME__   // or use a CI build number later
 
 // ============================================================================
