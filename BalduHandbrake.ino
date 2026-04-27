@@ -57,6 +57,7 @@ static volatile bool configDirty = false;
 // ============================================================================
 //  HID sampling rate monitor — pure integer math
 // ============================================================================
+/*
 void monitorHIDRate(uint32_t now_us) {
     static uint32_t last_us       = 0;
     static uint32_t deviant_count = 0;
@@ -93,7 +94,7 @@ void monitorHIDRate(uint32_t now_us) {
         max_period    = 1000;
         sample_count  = 0;
     }
-}
+}*/
 
 // ============================================================================
 //  Core 0 Task — Sensor Pipeline + HID (1000 Hz)

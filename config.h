@@ -22,7 +22,7 @@
 //  FIRMWARE VERSION
 // ============================================================================
 // Update this for every release. Format: MAJOR.MINOR.PATCH
-#define FW_VERSION          "v1.5.3"
+#define FW_VERSION          "v1.5.4"
 #define FW_BUILD            __DATE__ " " __TIME__   // or use a CI build number later
 
 // ============================================================================
@@ -36,13 +36,13 @@
 //  ADC HARDWARE SELECTION — uncomment exactly one
 // ============================================================================
 // ADC
-#define ADC_ADS1115
+//#define ADC_ADS1115
 //#define ADC_ADS122C04  //Preliminary work to support the ADS122C04
 //#define ADC_NAU7802    //Preliminary support of NAU7802 for load cells
 //#define ADC_HX711      //Preliminary support of HX711 for load cells
 
 // Sensor type
-#define SENSOR_PRESSURE_TRANSDUCER
+//#define SENSOR_PRESSURE_TRANSDUCER
 //#define SENSOR_LOAD_CELL
 
 // ============================================================================
