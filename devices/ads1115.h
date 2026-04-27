@@ -41,6 +41,12 @@ static ADS1115 ads(ADS1115_ADDR);
 // ============================================================================
 //  ADC rate table — single source of truth for supported sample rates
 // ============================================================================
+// NOTE: ADS1115 datasheet maximum is 860 SPS. The 1000 Hz entry is accepted
+// for consistency with other ADCs but is silently mapped to 860 SPS (register 7).
+// The sensor pipeline gracefully handles this via the "reuse last value" path
+// when adcDataReady() returns true (always for ADS1115). This does not affect
+// functionality thanks to the median + EMA filter.
+
 static const uint8_t ADC_REG_VALUES[] = { 5,   6,   7,   7    };
 const uint16_t SENSOR_RATE_OPTIONS[]  = { 250, 475, 860, 1000 };
 

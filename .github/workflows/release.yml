@@ -1,0 +1,73 @@
+name: Release - Build All Variants
+
+on:
+  workflow_dispatch:          # ← Main way: Run manually from Actions tab
+  push:
+    tags:
+      - 'v*.*.*'              # Also triggers automatically on version tags
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          # ADS1115 only works with pressure transducers
+          - adc: ADS1115
+            sensor: PRESSURE_TRANSDUCER
+
+          # ADS122C04 works with both
+          - adc: ADS122C04
+            sensor: PRESSURE_TRANSDUCER
+          - adc: ADS122C04
+            sensor: LOAD_CELL
+
+          # Dedicated load cell ADCs
+          - adc: NAU7802
+            sensor: LOAD_CELL
+          - adc: HX711
+            sensor: LOAD_CELL
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Arduino CLI
+        uses: arduino/setup-arduino-cli@v2
+
+      - name: Install ESP32 core
+        run: |
+          arduino-cli core update-index --additional-urls https://raw.githubusercontent.com/espressif/arduino-esp32/gh-pages/package_esp32_index.json
+          arduino-cli core install esp32:esp32
+
+      - name: Build ${{ matrix.adc }} + ${{ matrix.sensor }}
+        run: |
+          ADC_FLAG="-DADC_${{ matrix.adc }}"
+          SENSOR_FLAG="-DSENSOR_${{ matrix.sensor }}"
+
+          arduino-cli compile \
+            --fqbn esp32:esp32:esp32s3 \
+            --build-property "build.extra_flags=${ADC_FLAG} ${SENSOR_FLAG}" \
+            --build-property "build.psram=enabled" \
+            --build-property "build.flash_size=4MB" \
+            --warnings all \
+            BalduHandbrake.ino
+
+      - name: Rename firmware
+        run: |
+          VERSION=${GITHUB_REF#refs/tags/}
+          if [ -z "$VERSION" ]; then
+            VERSION="manual-$(date +%Y%m%d-%H%M)"
+          fi
+          mv build/esp32.esp32.esp32s3/BalduHandbrake.ino.bin \
+             BalduHandbrake-${{ matrix.adc }}-${{ matrix.sensor }}-${VERSION}.bin
+
+      - name: Create Release (if tag) or Upload Artifact
+        uses: softprops/action-gh-release@v2
+        if: startsWith(github.ref, 'refs/tags/')
+        with:
+          files: BalduHandbrake-${{ matrix.adc }}-${{ matrix.sensor }}-*.bin
+          draft: false
+          prerelease: false
+          generate_release_notes: true

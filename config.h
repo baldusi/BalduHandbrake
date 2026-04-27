@@ -19,6 +19,13 @@
 #include <Arduino.h>
 
 // ============================================================================
+//  FIRMWARE VERSION
+// ============================================================================
+// Update this for every release. Format: MAJOR.MINOR.PATCH
+#define FW_VERSION          "v1.5.0"
+#define FW_BUILD            __DATE__ " " __TIME__   // or use a CI build number later
+
+// ============================================================================
 //  USB IDENTITY
 // ============================================================================
 #define USB_SERIAL_STR       "BalduHandbrake-v1"
@@ -43,19 +50,19 @@
 // ============================================================================
 
 //Hardware Version 1.0
-#define HOLD_BUTTON_PIN       4
-#define ROTARY_CHANNEL_A_PIN  5
-#define ROTARY_CHANNEL_B_PIN  13
-#define ROTARY_BUTTON_PIN     3
-#define OLED_CS               10
-#define OLED_DC               6
-#define OLED_RST              7
-#define OLED_SCK              12
-#define OLED_MOSI             11
-#define OLED_MISO             -1
-#define I2C_SDA_PIN           8
-#define I2C_SCL_PIN           9
-#define ADS_DRDY_PIN          -1 //For ADS122C04 or other ADS with a Data Ready line. -1 means not connected
+//#define HOLD_BUTTON_PIN       4
+//#define ROTARY_CHANNEL_A_PIN  5
+//#define ROTARY_CHANNEL_B_PIN  13
+//#define ROTARY_BUTTON_PIN     3
+//#define OLED_CS               10
+//#define OLED_DC               6
+//#define OLED_RST              7
+//#define OLED_SCK              12
+//#define OLED_MOSI             11
+//#define OLED_MISO             -1
+//#define I2C_SDA_PIN           8
+//#define I2C_SCL_PIN           9
+//#define ADS_DRDY_PIN          -1 //For ADS122C04 or other ADS with a Data Ready line. -1 means not connected
 
 /*
 //Hardware Version 1.1
@@ -63,6 +70,7 @@
 //trace crosses. If you have separate VCC and GND planes, you can use a
 //single layer for signals. And in a 2 layer PCB, you minimize your need
 //for vias and using the bottom plane to cross the VCC.
+*/
 
 #ifdef ADC_ADS122C04
     #define ADS_DRDY_PIN            1
@@ -77,12 +85,12 @@
 #define ROTARY_BUTTON_PIN     6
 #define OLED_MOSI             13
 #define OLED_SCK              12
-//#define OLED_MISO             11
+#define OLED_MISO             -1 //11
 #define OLED_CS               10
 #define OLED_DC               9
 #define OLED_RST              8
 #define HOLD_BUTTON_PIN       7
-*/
+
 
 
 // ============================================================================
@@ -303,14 +311,18 @@ enum DisplayState : uint8_t {
 // ============================================================================
 //  DEFAULT BEHAVIOR
 // ============================================================================
-//#define DEFAULT_SAMPLE_RATE_HZ    1000
+// NOTE: ADS1115 datasheet maximum is 860 SPS. The 1000 Hz entry is accepted
+// for consistency with other ADCs but is silently mapped to 860 SPS (register 7).
+// The sensor pipeline gracefully handles this via the "reuse last value" path
+// when adcDataReady() returns true (always for ADS1115). This does not affect
+// functionality thanks to the median + EMA filter.
 
 #ifdef ADC_NAU7802
-    #define DEFAULT_SAMPLE_RATE_HZ    320
+    #define DEFAULT_SAMPLE_RATE_HZ    320	//Maximum hardware capability
 #elif defined(ADC_HX711)
-    #define DEFAULT_SAMPLE_RATE_HZ     80
+    #define DEFAULT_SAMPLE_RATE_HZ     80	//Only supported sample rate
 #else
-    #define DEFAULT_SAMPLE_RATE_HZ   1000
+    #define DEFAULT_SAMPLE_RATE_HZ   1000	//We consider this the standard
 #endif
 #define DEFAULT_DISPLAY_RATE_HZ     30
 #define DEFAULT_DEBOUNCE_MS         50

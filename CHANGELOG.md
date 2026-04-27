@@ -5,6 +5,19 @@ All notable changes to **BalduHandbrake** will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),  
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.5.0] - 2026-04-26
+### Added
+- `tools/BalduHandbrake-LUT-Generator.py`
+- `FW_VERSION` and `FW_BUILD` in `BalduHandbrake.ino`, `config.h` and `display.cpp`
+- `.github/workflows/build.yml` and `.github/workflows/release.yml` for automation
+- Version 1.2 hardware schematic with ESP32-S3 Nano and ADS1220 on SPI3, for future support.
+
+### Changed
+- Minor version as it changed some strings and enabled the new version and build and release automation.
+
+### Fixed
+- Typos and inconsistencies on README.md, QUICKSTART.md, `sensor.cpp`, 
+
 ## [1.4.1] - 2026-04-25
 ### Added
 - `USAGE.md` (daily operation manual)

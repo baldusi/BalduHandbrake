@@ -204,6 +204,11 @@ void setup() {
     unsigned long serialWait = millis();
     while (!Serial && (millis() - serialWait) < 500) { }
     Serial.println("\n===== BalduHandbrake Initializing =====");
+	Serial.print(STR_BOOT_VERSION);
+	Serial.print(FW_VERSION);
+	Serial.print(" (build ");
+	Serial.print(FW_BUILD);
+	Serial.println(")");
     Serial.print("Sensor Mode: ");
     #ifdef SENSOR_PRESSURE_TRANSDUCER
         Serial.println("pressure transducer");
@@ -212,17 +217,6 @@ void setup() {
     #endif
 
     // --- 3. I2C + ADC ---
-    //Wire.begin(I2C_SDA_PIN, I2C_SCL_PIN);       // Setup the I2C bus pins
-    //Wire.setClock(I2C_WIRE_SPEED);              // Set the bus speed to 400khz
-
-    //if (sensorInit()) {
-    //    Serial.print(ADS_SENSOR_NAME);
-    //    Serial.println(": OK");
-    //} else {
-    //    Serial.print(ADS_SENSOR_NAME);
-    //    Serial.println(": NOT FOUND");
-    //}
-
     sensorBusInit();
 
     if (sensorInit()) {
@@ -234,6 +228,7 @@ void setup() {
     }
 
     // --- 4. SPI + OLED ---
+	// Be carefull if you ever implement a SPI ADC, SPI2_HOST is used by the display, use SPI3_HOST for the ADC.
     displayInit();
     Serial.println("SSD1351: OK");
 

@@ -31,9 +31,9 @@
     #include "devices/hx711.h"
 #endif
 
-// Safety check: NAU7802 is load-cell only
-#if defined(ADC_NAU7802) && !defined(SENSOR_LOAD_CELL)
-    #error "NAU7802 requires SENSOR_LOAD_CELL — it is a load cell amplifier, not a general-purpose ADC"
+// Safety check: ADS1115 is pressure transducer only / NAU7802 and HX711 are load-cell only
+#if defined(ADC_ADS1115) && !defined(SENSOR_PRESSURE_TRANSDUCER)
+    #error "ADS1115 requires SENSOR_PRESSURE_TRANSDUCER"
 #endif
 #if defined(ADC_NAU7802) && !defined(SENSOR_LOAD_CELL)
     #error "NAU7802 requires SENSOR_LOAD_CELL"

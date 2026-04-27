@@ -50,7 +50,7 @@ The code base is highly abstracted, allowing for easily adding sensor models, la
 
 #### Hardware V1.0 (deprecated)
 
-The original hardware design was done on traditional 
+The original hardware design was done on traditional protoboard, where crossing cables is easy. But is inelegant and adds unnecessary complexity to design a PCB board.
 
 | Function | GPIO |
 |---|---|
@@ -96,6 +96,8 @@ In general we use 104 and 106 capacitors as noise filters on the lines. We also 
 
 #### ADS1115 — Pressure Transducer
 This is the original development platform and the easiest to source and wire as the ASD1115 is widely available and very easy to use, regardless of its 860SPS limitation, lack of DRDY pin and the fact that it can't take VADD as reference.
+
+*Note: the ADS1115 has a hardware limitation on maximum sample rate of 860SPS. For simplification purposes 1000kHz is displayed.*
 
 **Important:** Please note that the 5V pressure transducer requires the use of a logic level converter between the ADC and the ESP32-S3 Zero, as the latter lacks 5V tolerance on its pins.
 
@@ -468,6 +470,22 @@ The on-device calibration routine:
 3. Repeats the process with the handle pulled to maximum to establish the full-scale point
 4. Psi and Kgf display always uses the transducer's physical specification as defined in `ADC_SPEC_FULL` — calibration only affects the Z-axis mapping. But the calibration routine displays the raw values.
 5. If you want to establish the `ADC_SPEC_ZERO`, initially set it to 0, set the deadzones to 0, do the calibration procedure, write down the zero value, and then commit it to the `config.h`. Please note that that value will only hold for that particular combination of ADC chip, particular load cell and handbrake build.
+
+**IMPORTANT:** The calibration rutine sampling parameters defined in `config.h`
+
+```
+// PLACEHOLDER values — adjust after testing with real hardware
+#define CALIB_SAMPLE_COUNT        500   // Total samples to collect
+#define CALIB_SAMPLE_DURATION_MS  5000  // Duration of sample collection window
+#define CALIB_OUTLIER_REJECT_PCT  0.05f // Reject top and bottom 5% of samples
+
+// Settling detection parameters
+#define CALIB_STABILITY_COUNT     50    // Consecutive stable samples required (~300ms)
+#define CALIB_STABILITY_BAND_PCT  5     // Max deviation as % of ADC span (PLACEHOLDER)
+#define CALIB_ZERO_CEILING_PCT    15    // Zero readings must be below this % of span (PLACEHOLDER)
+#define CALIB_MAX_FLOOR_PCT       30    // Max readings must be above this % of span (PLACEHOLDER)
+```
+Has not been empirically validated. Any help on tuning these parameters would be appreciated.
 
 ### Transducer Specifications
 

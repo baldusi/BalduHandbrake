@@ -340,7 +340,11 @@ void displayBootScreen(uint8_t language) {
 
     lcd.setTextColor(LIVE_LABEL_COLOR, LIVE_BG_COLOR);
     lcd.setCursor(8, 66);
-	lcd.print(str(STR_BOOT_VERSION));
+    lcd.print(STR_BOOT_VERSION);
+	lcd.print(FW_VERSION);
+	lcd.print(" (build: ");
+	lcd.print(FW_BUILD);
+	lcd.print(")");
     lcd.setCursor(8, 80);
 	lcd.print(str(STR_BOOT_AUTHOR));
     lcd.setTextColor(LIVE_OK_COLOR, LIVE_BG_COLOR);

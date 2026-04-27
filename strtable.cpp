@@ -14,7 +14,7 @@ static const char* const STRING_TABLE[NUM_LANGUAGES][NUM_STRINGS] = {
     // ---- LANG_EN ----
     {
 		"E-BRAKE",				//STR_BOOT_TITLE = 0,
-		"v1.4.1",				//STR_BOOT_VERSION,
+		"Version: ",			//STR_BOOT_VERSION,
 		"A.Belluscio",			//STR_BOOT_AUTHOR,
 		"BalduHandbrake",		//STR_BOOT_PROJECT,
 		"Initializing...",		//STR_BOOT_STATUS,
@@ -73,7 +73,7 @@ static const char* const STRING_TABLE[NUM_LANGUAGES][NUM_STRINGS] = {
 	// ---- LANG_ES ----
     {
         "E-BRAKE",              //STR_BOOT_TITLE = 0,
-        "v1.4.1",               //STR_BOOT_VERSION,
+        "Version: ",            //STR_BOOT_VERSION,
         "A.Belluscio",          //STR_BOOT_AUTHOR,
         "BalduHandbrake",       //STR_BOOT_PROJECT,
         "Iniciando...",         //STR_BOOT_STATUS,
