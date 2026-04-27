@@ -53,6 +53,7 @@ jobs:
 
           arduino-cli compile \
             --fqbn esp32:esp32:esp32s3 \
+            --output-dir ./firmware \
             --build-property "build.extra_flags=${ADC_FLAG} ${SENSOR_FLAG}" \
             --build-property "build.psram=enabled" \
             --build-property "build.flash_size=4MB" \
@@ -65,7 +66,7 @@ jobs:
           if [ -z "$VERSION" ]; then
             VERSION="manual-$(date +%Y%m%d-%H%M)"
           fi
-          mv build/esp32.esp32.esp32s3/BalduHandbrake.ino.bin \
+          mv firmware/BalduHandbrake.ino.bin \
              BalduHandbrake-${{ matrix.adc }}-${{ matrix.sensor }}-${VERSION}.bin
 
       - name: Create GitHub Release
